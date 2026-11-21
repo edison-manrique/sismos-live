@@ -16,20 +16,20 @@
 .main {
   display: grid;
   flex: 1;
-  grid-template-columns: minmax(0, 1fr) 408px;
+  grid-template-columns: minmax(0, 1fr) 368px;
   min-height: 0;
   overflow: hidden;
 }
 
 @media (max-width: 1180px) {
   .main {
-    grid-template-columns: minmax(0, 1fr) 366px;
+    grid-template-columns: minmax(0, 1fr) 340px;
   }
 }
 
 @media (max-width: 900px) {
   .main {
-    grid-template-columns: minmax(0, 1fr) 338px;
+    grid-template-columns: minmax(0, 1fr) 316px;
   }
 }
 

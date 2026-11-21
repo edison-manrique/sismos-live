@@ -2,6 +2,7 @@
   "name": "@sismos/web",
   "version": "1.0.0",
   "private": true,
+  "author": "Edison Manrique Chocce",
   "type": "module",
   "scripts": {
     "dev": "vite --host 0.0.0.0 --port 3000",

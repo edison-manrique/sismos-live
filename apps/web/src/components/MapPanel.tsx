@@ -43,7 +43,7 @@ export default function MapPanel() {
   const [view, setView] = createSignal<ViewInfo | null>(null);
   const [themesOpen, setThemesOpen] = createSignal(false);
   const [popupEl, setPopupEl] = createSignal<HTMLElement | null>(null);
-  const [popupSize, setPopupSize] = createSignal({ width: 344, height: 340 });
+  const [popupSize, setPopupSize] = createSignal({ width: 324, height: 320 });
 
   createEffect(() => {
     const el = popupEl();
@@ -51,8 +51,8 @@ export default function MapPanel() {
     if (!el) return;
     const measure = () => {
       setPopupSize({
-        width: el.offsetWidth || 344,
-        height: el.offsetHeight || 340,
+        width: el.offsetWidth || 324,
+        height: el.offsetHeight || 320,
       });
     };
     measure();
@@ -94,12 +94,14 @@ export default function MapPanel() {
     const cardW = Math.min(measuredW, Math.max(220, info.width - margin * 2));
     const cardH = Math.min(measuredH, Math.max(160, info.height - margin * 2));
 
-    const x = clamp(point.x - cardW / 2, margin, Math.max(margin, info.width - cardW - margin));
+    const x = Math.round(
+      clamp(point.x - cardW / 2, margin, Math.max(margin, info.width - cardW - margin)),
+    );
     const fitsAbove = point.y - gap - cardH >= margin;
     const fitsBelow = point.y + gap + cardH <= info.height - margin;
     const below = fitsAbove ? false : fitsBelow ? true : info.height - point.y > point.y;
     const rawY = below ? point.y + gap : point.y - gap - cardH;
-    const y = clamp(rawY, margin, Math.max(margin, info.height - cardH - margin));
+    const y = Math.round(clamp(rawY, margin, Math.max(margin, info.height - cardH - margin)));
 
     return { event, x, y, below };
   });

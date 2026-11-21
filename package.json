@@ -2,6 +2,7 @@
   "name": "sismos-live",
   "version": "1.0.0",
   "private": true,
+  "author": "Edison Manrique Chocce",
   "description": "Monitoreo sísmico en tiempo real (EMSC WebSocket + USGS REST) con SolidJS y un motor de mapas propio.",
   "workspaces": [
     "packages/*",

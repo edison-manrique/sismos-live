@@ -1,6 +1,7 @@
 {
   "name": "@sismos/seismic",
   "version": "1.0.0",
+  "author": "Edison Manrique Chocce",
   "description": "Librería de datos sísmicos: clientes EMSC (WebSocket) y USGS (REST), normalización, filtros, estadísticas y feed reactivo.",
   "type": "module",
   "main": "./src/index.ts",

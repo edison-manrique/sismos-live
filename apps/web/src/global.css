@@ -21,7 +21,7 @@
   --font-display: 'Gemunu Libre', 'Inter', system-ui, sans-serif;
   --font: 'Aldrich', 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
   --mono: 'Aldrich', 'JetBrains Mono', ui-monospace, monospace;
-  --header-h: 68px;
+  --header-h: 58px;
   color-scheme: dark;
 }
 
@@ -50,8 +50,11 @@ body {
   font-family: var(--font);
   font-size: 14px;
   line-height: 1.45;
+  font-synthesis: none;
+  font-synthesis-weight: none;
   -webkit-font-smoothing: antialiased;
-  text-rendering: optimizeLegibility;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: geometricPrecision;
 }
 
 button,

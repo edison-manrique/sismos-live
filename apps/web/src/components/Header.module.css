@@ -4,9 +4,9 @@
   display: flex;
   flex-shrink: 0;
   align-items: center;
-  gap: 22px;
+  gap: 16px;
   height: var(--header-h);
-  padding: 0 18px;
+  padding: 0 14px;
   border-bottom: 1px solid var(--border);
   background:
     linear-gradient(180deg, rgba(13, 21, 37, 0.94), rgba(7, 12, 22, 0.9)),
@@ -17,17 +17,17 @@
 .brand {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   min-width: 0;
 }
 
 .logo {
   display: grid;
   place-items: center;
-  width: 42px;
-  height: 42px;
+  width: 36px;
+  height: 36px;
   flex-shrink: 0;
-  border-radius: 13px;
+  border-radius: 11px;
   border: 1px solid rgba(255, 138, 61, 0.35);
   background:
     radial-gradient(circle at 30% 20%, rgba(255, 176, 32, 0.24), transparent 65%),
@@ -80,8 +80,8 @@
 .metrics {
   display: flex;
   align-items: center;
-  gap: 16px;
-  padding: 7px 16px;
+  gap: 12px;
+  padding: 5px 13px;
   border: 1px solid var(--border);
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.018);
@@ -120,21 +120,21 @@
 .actions {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   margin-left: auto;
   min-width: 0;
 }
 
 .regionToggle {
   display: flex;
-  padding: 3px;
+  padding: 2px;
   border: 1px solid var(--border);
   border-radius: 999px;
   background: rgba(6, 11, 20, 0.7);
 }
 
 .regionBtn {
-  padding: 5px 12px;
+  padding: 4px 10px;
   border: 0;
   border-radius: 999px;
   background: transparent;
@@ -167,10 +167,10 @@
 .iconBtn {
   display: grid;
   place-items: center;
-  width: 33px;
-  height: 33px;
+  width: 30px;
+  height: 30px;
   border: 1px solid transparent;
-  border-radius: 9px;
+  border-radius: 8px;
   background: transparent;
   color: var(--text-dim);
   transition:

@@ -1,8 +1,8 @@
 .panel {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  padding: 13px 16px 14px;
+  gap: 8px;
+  padding: 10px 13px;
   border-bottom: 1px solid var(--border);
   background: rgba(8, 13, 24, 0.42);
 }
@@ -59,8 +59,8 @@
 
 .search {
   width: 100%;
-  height: 36px;
-  padding: 0 32px 0 34px;
+  height: 32px;
+  padding: 0 30px 0 32px;
   border: 1px solid var(--border);
   border-radius: 9px;
   background: rgba(5, 9, 16, 0.65);
@@ -106,7 +106,7 @@
 .sliderBlock {
   display: flex;
   flex-direction: column;
-  gap: 7px;
+  gap: 4px;
 }
 
 .sliderHead {
@@ -193,20 +193,20 @@
 .group {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
 }
 
 .chips {
   display: flex;
   flex-wrap: wrap;
-  gap: 5px;
+  gap: 4px;
 }
 
 .chip {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  padding: 5px 10px;
+  padding: 4px 8px;
   border: 1px solid var(--border);
   border-radius: 7px;
   background: rgba(255, 255, 255, 0.018);

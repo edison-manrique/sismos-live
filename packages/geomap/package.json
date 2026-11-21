@@ -1,6 +1,7 @@
 {
   "name": "@sismos/geomap",
   "version": "1.0.0",
+  "author": "Edison Manrique Chocce",
   "description": "Motor de mapas de teselas ligero (Web Mercator, pan/zoom/pinch, marcadores y temas CARTO/Esri) sin dependencias.",
   "type": "module",
   "main": "./src/index.ts",
