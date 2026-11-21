@@ -69,15 +69,20 @@ interface PinchState {
   anchor: LatLng;
 }
 
+interface TileLevelEntry {
+  el: HTMLDivElement;
+  tiles: Map<string, HTMLImageElement>;
+}
+
 type Listener = (payload: unknown) => void;
 
 /**
  * Motor de mapas de teselas sin dependencias.
  *
- * - Proyección Web Mercator y zoom fraccional.
- * - Pan con puntero, rueda, pinch, teclado y doble clic.
- * - Marcadores DOM reutilizados (diff por `id`) y caja de selección.
- * - Temas CARTO (voyager/dark/light) y satélite Esri.
+ * - Proyección Web Mercator y zoom fraccional con asentamiento en enteros.
+ * - Pan con puntero, rueda centrada en el cursor, pinch, teclado y doble clic.
+ * - Pirámide de teselas retenida entre niveles de zoom para evitar parpadeos o pantallas negras.
+ * - Marcadores DOM reutilizados (diff por `id`), polígonos SVG y caja de selección.
  */
 export class TileMap {
   private readonly root: HTMLDivElement;
@@ -96,7 +101,7 @@ export class TileMap {
   private readonly resizeObserver: ResizeObserver;
   private readonly listeners = new Map<keyof MapEventMap, Set<Listener>>();
   private readonly markerEls = new Map<string, MarkerEntry>();
-  private readonly tileEls = new Map<string, HTMLImageElement>();
+  private readonly tileLevels = new Map<number, TileLevelEntry>();
   private readonly pointers = new Map<number, Point>();
 
   private center: LatLng;
@@ -105,7 +110,9 @@ export class TileMap {
   private interactive: boolean;
   private width = 1;
   private height = 1;
-  private tileZoom = -1;
+  private activeTileZ = -1;
+  private flyFromZoom: number | null = null;
+  private flyTargetZoom: number | null = null;
   private selectionBounds: Bounds | null = null;
   private selectionPolygon: LatLng[][] | null = null;
   private selectedId: string | null = null;
@@ -187,7 +194,7 @@ export class TileMap {
     this.root.dataset.theme = theme;
     this.updateAttribution();
     this.clearTiles();
-    this.tileZoom = -1;
+    this.activeTileZ = -1;
     this.render();
     this.emit('theme-change', { theme });
   }
@@ -224,25 +231,39 @@ export class TileMap {
   }
 
   flyTo(center: LatLng, zoom = this.zoom, duration = 700): void {
+    if (!Number.isFinite(center.lat) || !Number.isFinite(center.lon) || !Number.isFinite(zoom)) {
+      return;
+    }
     this.cancelAnimation();
     const fromCenter = { ...this.center };
     const fromZoom = this.zoom;
     const targetZoom = clamp(zoom, this.minZoom, this.maxZoom);
     const targetLat = clampLat(center.lat);
-    let deltaLon = center.lon - fromCenter.lon;
+    const targetLon = wrapLon(center.lon);
+    let deltaLon = targetLon - fromCenter.lon;
     if (deltaLon > 180) deltaLon -= 360;
     if (deltaLon < -180) deltaLon += 360;
+
+    this.flyFromZoom = fromZoom;
+    this.flyTargetZoom = targetZoom;
 
     const start = performance.now();
     const step = (now: number) => {
       if (this.destroyed) return;
       const t = Math.min(1, (now - start) / Math.max(1, duration));
       const k = 1 - (1 - t) ** 3;
-      this.center = {
-        lat: fromCenter.lat + (targetLat - fromCenter.lat) * k,
-        lon: wrapLon(fromCenter.lon + deltaLon * k),
-      };
-      this.zoom = fromZoom + (targetZoom - fromZoom) * k;
+      this.center =
+        t >= 1
+          ? { lat: targetLat, lon: targetLon }
+          : {
+              lat: fromCenter.lat + (targetLat - fromCenter.lat) * k,
+              lon: wrapLon(fromCenter.lon + deltaLon * k),
+            };
+      this.zoom = t >= 1 ? targetZoom : fromZoom + (targetZoom - fromZoom) * k;
+      if (t >= 1) {
+        this.flyFromZoom = null;
+        this.flyTargetZoom = null;
+      }
       this.render();
       if (t < 1) {
         this.animationRaf = requestAnimationFrame(step);
@@ -437,16 +458,11 @@ export class TileMap {
   private render(): void {
     if (this.destroyed) return;
     const { z, scale } = this.scaleInfo();
-    if (z !== this.tileZoom) {
-      this.clearTiles();
-      this.tileZoom = z;
-    }
     const offset = this.offsetFor(z, scale);
-    this.tileLayer.style.transform =
-      scale === 1
-        ? `translate3d(${offset.x}px, ${offset.y}px, 0)`
-        : `translate3d(${offset.x}px, ${offset.y}px, 0) scale(${scale})`;
-    this.syncTiles(z, offset, scale);
+    const activeZ = this.activeTileZoom(z);
+    this.activeTileZ = activeZ;
+
+    this.renderTilePyramid(activeZ);
     this.positionMarkers(z, offset, scale);
     this.renderSelection();
     this.updateScale();
@@ -464,6 +480,91 @@ export class TileMap {
     return { z, scale: 2 ** (this.zoom - z) };
   }
 
+  private activeTileZoom(defaultZ: number): number {
+    if (
+      this.flyFromZoom != null &&
+      this.flyTargetZoom != null &&
+      Math.abs(this.flyTargetZoom - this.flyFromZoom) > 1.2 &&
+      Math.abs(this.zoom - this.flyTargetZoom) > 1.2
+    ) {
+      // Evita pedir teselas de zooms intermedios durante vuelos largos.
+      const holdZ =
+        this.flyTargetZoom > this.flyFromZoom
+          ? Math.round(this.flyFromZoom)
+          : Math.round(this.flyTargetZoom);
+      return clamp(holdZ, 0, Math.min(22, this.maxZoom));
+    }
+    return defaultZ;
+  }
+
+  private levelScaleInfo(levelZ: number): { scale: number; offset: Point } {
+    const isExact = Math.abs(this.zoom - levelZ) < 1e-4;
+    const scale = isExact ? 1 : 2 ** (this.zoom - levelZ);
+    return { scale, offset: this.offsetFor(levelZ, scale) };
+  }
+
+  private renderTilePyramid(activeZ: number): void {
+    const { total, loaded } = this.syncLevelTiles(activeZ);
+
+    for (const [levelZ, entry] of this.tileLevels) {
+      const { scale, offset } = this.levelScaleInfo(levelZ);
+      entry.el.style.zIndex = levelZ === activeZ ? '2' : '1';
+      entry.el.style.transform =
+        scale === 1
+          ? `translate3d(${offset.x}px, ${offset.y}px, 0)`
+          : `translate3d(${offset.x}px, ${offset.y}px, 0) scale(${scale})`;
+
+      if (levelZ !== activeZ) {
+        for (const [key, img] of entry.tiles) {
+          if (!img.classList.contains(styles.loaded)) {
+            img.remove();
+            entry.tiles.delete(key);
+          }
+        }
+      }
+    }
+
+    this.pruneFallbackLevels(activeZ, total > 0 && loaded >= total);
+  }
+
+  private pruneFallbackLevels(activeZ: number, activeComplete: boolean): void {
+    const fallbacks: Array<{ z: number; loadedCount: number; entry: TileLevelEntry }> = [];
+    for (const [levelZ, entry] of this.tileLevels) {
+      if (levelZ === activeZ) continue;
+      let loadedCount = 0;
+      for (const img of entry.tiles.values()) {
+        if (img.classList.contains(styles.loaded)) loadedCount += 1;
+      }
+      if (activeComplete || loadedCount === 0) {
+        entry.el.remove();
+        this.tileLevels.delete(levelZ);
+      } else {
+        fallbacks.push({ z: levelZ, loadedCount, entry });
+      }
+    }
+
+    if (fallbacks.length > 1) {
+      fallbacks.sort(
+        (a, b) =>
+          b.loadedCount - a.loadedCount || Math.abs(a.z - activeZ) - Math.abs(b.z - activeZ),
+      );
+      for (let i = 1; i < fallbacks.length; i += 1) {
+        fallbacks[i].entry.el.remove();
+        this.tileLevels.delete(fallbacks[i].z);
+      }
+    }
+  }
+
+  private checkActiveLevelReady(z: number): void {
+    if (this.destroyed || z !== this.activeTileZ) return;
+    const entry = this.tileLevels.get(z);
+    if (!entry || entry.tiles.size === 0) return;
+    for (const img of entry.tiles.values()) {
+      if (!img.classList.contains(styles.loaded)) return;
+    }
+    this.pruneFallbackLevels(z, true);
+  }
+
   private offsetFor(z: number, scale: number): Point {
     const centerX = lonToWorldX(this.center.lon, z, this.tileSize);
     const centerY = latToWorldY(this.center.lat, z, this.tileSize);
@@ -472,7 +573,16 @@ export class TileMap {
     return scale === 1 ? { x: Math.round(x), y: Math.round(y) } : { x, y };
   }
 
-  private syncTiles(z: number, offset: Point, scale: number): void {
+  private syncLevelTiles(z: number): { total: number; loaded: number } {
+    let level = this.tileLevels.get(z);
+    if (!level) {
+      const el = div(styles.tileLevel);
+      this.tileLayer.appendChild(el);
+      level = { el, tiles: new Map() };
+      this.tileLevels.set(z, level);
+    }
+
+    const { scale, offset } = this.levelScaleInfo(z);
     const size = this.tileSize;
     const tileCount = 2 ** z;
     const x0 = Math.floor(-offset.x / scale / size);
@@ -482,11 +592,20 @@ export class TileMap {
     const needed = new Set<string>();
     const retina = this.retina && THEME_META[this.theme].retina;
 
+    let total = 0;
+    let loaded = 0;
+
     for (let y = y0; y <= y1; y += 1) {
       for (let x = x0; x <= x1; x += 1) {
         const key = `${z}:${x}:${y}`;
         needed.add(key);
-        if (this.tileEls.has(key)) continue;
+        total += 1;
+
+        const existing = level.tiles.get(key);
+        if (existing) {
+          if (existing.classList.contains(styles.loaded)) loaded += 1;
+          continue;
+        }
 
         const image = document.createElement('img');
         image.className = styles.tile;
@@ -499,37 +618,55 @@ export class TileMap {
         image.style.top = `${y * size}px`;
 
         const wrappedX = ((x % tileCount) + tileCount) % tileCount;
-        image.src = buildTileUrl(this.theme, wrappedX, y, z, { retina });
-        if (image.complete) image.classList.add(styles.loaded);
-        else {
-          image.addEventListener('load', () => image.classList.add(styles.loaded), {
-            once: true,
-          });
-        }
-        image.addEventListener(
-          'error',
-          () => {
-            image.style.visibility = 'hidden';
-          },
-          { once: true },
-        );
+        const tileUrl = buildTileUrl(this.theme, wrappedX, y, z, { retina });
+        let retried = false;
 
-        this.tileLayer.appendChild(image);
-        this.tileEls.set(key, image);
+        const markLoaded = () => {
+          image.style.visibility = '';
+          image.classList.add(styles.loaded);
+          this.checkActiveLevelReady(z);
+        };
+
+        image.addEventListener('load', markLoaded);
+        image.addEventListener('error', () => {
+          if (!retried && !this.destroyed) {
+            retried = true;
+            window.setTimeout(() => {
+              if (!this.destroyed && image.isConnected && !image.classList.contains(styles.loaded)) {
+                image.src = tileUrl;
+              }
+            }, 700);
+            return;
+          }
+          image.style.visibility = 'hidden';
+        });
+
+        image.src = tileUrl;
+        if (image.complete && image.naturalWidth > 0) {
+          image.classList.add(styles.loaded);
+          loaded += 1;
+        }
+
+        level.el.appendChild(image);
+        level.tiles.set(key, image);
       }
     }
 
-    for (const [key, element] of this.tileEls) {
+    for (const [key, element] of level.tiles) {
       if (!needed.has(key)) {
         element.remove();
-        this.tileEls.delete(key);
+        level.tiles.delete(key);
       }
     }
+
+    return { total, loaded };
   }
 
   private clearTiles(): void {
-    for (const element of this.tileEls.values()) element.remove();
-    this.tileEls.clear();
+    for (const level of this.tileLevels.values()) {
+      level.el.remove();
+    }
+    this.tileLevels.clear();
   }
 
   private positionMarkers(z: number, offset: Point, scale: number): void {
@@ -943,6 +1080,8 @@ export class TileMap {
   }
 
   private cancelAnimation(): void {
+    this.flyFromZoom = null;
+    this.flyTargetZoom = null;
     if (this.animationRaf != null) {
       cancelAnimationFrame(this.animationRaf);
       this.animationRaf = null;

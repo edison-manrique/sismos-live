@@ -1,234 +1,195 @@
 # @sismos/geomap
 
-Motor de mapas de teselas (raster) ligero, **sin dependencias**, escrito en TypeScript. Implementa **Web Mercator** con zoom fraccional, pan/zoom/pinch/teclado, marcadores con diffing, capa de selección (bounds) y cambio de tema en caliente.
+Motor de mapas ráster ligero, **sin dependencias externas**, escrito en TypeScript sobre proyección **Web Mercator (EPSG:3857)**. Ofrece pirámide multizoom retenida para evitar parpadeos o pantallas negras en transiciones, marcadores DOM con diffing por `id`, polígonos SVG de selección territorial y cambio de tema en caliente.
 
-Diseñado para reemplazar a Leaflet cuando solo se necesitan teselas ráster y marcadores, con una API mínima y ~8 KB gzipped.
+---
 
-## Características
+## Características principales
 
-- **Proyección Web Mercator** (EPSG:3857) con `zoom` fraccional (p. ej. 5.3) y transiciones suaves (`flyTo`).
-- **Teselas ráster** (`<img>`) con carga perezosa, subdominios configurables y limpieza automática fuera de viewport.
-- **Temas integrados** (sin API key):
-  - `dark` → **OpenTopoMap** (topográfico, curvas de nivel)
-  - `voyager` → **OpenStreetMap Standard** (callejero clásico)
-  - `light` → **OpenStreetMap DE** (estilo claro alemán)
-  - `satellite` → **Esri World Imagery**
-- **Interacción**: arrastrar (pointer), rueda (zoom centrado), doble clic (zoom in), pinch (touch), teclado (flechas, `+/-`).
-- **Marcadores**: diffing por `id`, etiqueta de magnitud, pulso animado para eventos recientes, click/hover con eventos.
-- **Capa de selección**: resalta un `Bounds` (p. ej. bbox de filtro).
-- **Controles UI opcionales**: barra de escala, atribución dinámica por tema.
-- **Eventos tipados**: `move`, `click`, `marker-click`, `marker-hover`, `zoom-end`, `theme-change`.
-- **SSR-safe**: sin acceso a `window`/`document` en importación; instanciación lazy en cliente.
+- **Proyección Web Mercator** con zoom fraccional fluido durante animaciones y asentamiento en niveles enteros alineados a píxel para máxima nitidez.
+- **Pirámide de teselas retenida**: conserva temporalmente el nivel de zoom anterior escalado bajo las nuevas teselas hasta que terminan de descargar, evitando destellos o fondos negros durante `flyTo`, zoom rápido o cambio de región, e incluye reintento ante errores transitorios.
+- **Zoom centrado en el cursor**: rueda del ratón, doble clic y controles respetan la posición del puntero dentro del viewport.
+- **Interacción completa**: arrastre con puntero, gesto pinch multitáctil, navegación por teclado (`+`, `-`, flechas direccionales).
+- **Marcadores DOM reutilizados**: actualización incremental por `id`, etiqueta de magnitud escalada, pulso animado configurable y eventos tipados de clic/hover.
+- **Superposiciones vectoriales y cajas**: polígonos SVG (`selectionPolygon`) para límites territoriales sin relleno y rectángulos `selectionBounds`.
+- **Controles integrados**: barra de escala métrica dinámica y atribución automática por proveedor.
 
-## Instalación
+---
+
+## Instalación e importación
 
 ```bash
 npm install @sismos/geomap
 ```
 
-Uso directo (source-first):
+Uso *source-first* dentro del monorepo:
 
 ```ts
-import { TileMap, MAP_THEMES, THEME_META, type MapMarker, type MapTheme } from '@sismos/geomap';
-import '@sismos/geomap/styles.css'; // o importa el .module.css desde tu bundler
+import {
+  TileMap,
+  MAP_THEMES,
+  THEME_META,
+  type MapMarker,
+  type MapTheme,
+} from '@sismos/geomap';
 ```
 
-> **Nota**: El CSS se entrega como `TileMap.module.css` (CSS Modules). Si tu bundler no soporta CSS Modules, copia el contenido a un `.css` global y ajusta los nombres de clase.
+---
 
-## Uso rápido
+## Ejemplo de uso
 
 ```ts
-import { TileMap, MAP_THEMES, type MapMarker, type LatLng } from '@sismos/geomap';
+import { TileMap, type MapMarker } from '@sismos/geomap';
 
 const container = document.getElementById('map')!;
 
 const markers: MapMarker[] = [
-  { id: 'eq-1', lat: -9.19, lon: -75.02, magnitude: 6.7, color: '#ff5f3d', size: 22, label: '6.7', title: 'M6.7 · Perú' },
+  {
+    id: 'eq-1',
+    lat: -12.05,
+    lon: -77.04,
+    magnitude: 6.1,
+    color: '#ff5f3d',
+    size: 24,
+    label: '6.1',
+    pulse: true,
+    title: 'M6.1 · Lima, Perú',
+  },
 ];
 
 const map = new TileMap(container, {
-  theme: 'dark',
+  theme: 'voyager',
   center: { lat: -9.19, lon: -75.02 },
   zoom: 5,
   minZoom: 2,
   maxZoom: 17,
   markers,
-  selectionBounds: { minLat: -18.5, maxLat: 0, minLon: -81.5, maxLon: -68.5 },
 });
 
-// Suscripciones tipadas
-const unmove = map.on('move', (info) => console.log('center', info.center, 'zoom', info.zoom));
-const unclick = map.on('marker-click', ({ marker, screen }) => console.log(marker.id, screen));
+const stopMove = map.on('move', (view) => console.log(view.center, view.zoom));
+const stopMarker = map.on('marker-click', ({ marker, screen }) => {
+  console.log(marker.id, screen);
+  map.flyTo({ lat: marker.lat, lon: marker.lon }, 10, 700);
+});
 
-// Cambiar tema en caliente
 map.setTheme('satellite');
+map.setSelectionPolygon([
+  { lat: -3.41, lon: -80.28 },
+  { lat: -18.35, lon: -70.38 },
+  { lat: -12.05, lon: -77.16 },
+]);
 
-// Volar a coordenadas
-map.flyTo({ lat: -12.05, lon: -77.03 }, 8, 800);
-
-// Ajustar a bounds
-map.fitBounds({ minLat: -20, maxLat: -10, minLon: -80, maxLon: -70 }, 56, true);
-
-// Limpieza
-unmove();
-unclick();
+// Limpieza al desmontar
+stopMove();
+stopMarker();
 map.destroy();
 ```
 
-## API
+---
 
-### `TileMap`
+## API pública
 
-```ts
-constructor(container: HTMLElement, options: TileMapOptions = {})
-```
+### `TileMap(container, options?)`
 
 #### `TileMapOptions`
 
 ```ts
 interface TileMapOptions {
-  center?: LatLng;           // default: { lat: 0, lon: 0 }
-  zoom?: number;             // default: 5 (fraccional permitido)
-  minZoom?: number;          // default: 2
-  maxZoom?: number;          // default: 18
-  theme?: MapTheme;          // 'dark' | 'voyager' | 'light' | 'satellite'
-  markers?: MapMarker[];     // array inicial
-  interactive?: boolean;     // default: true
-  attribution?: string;      // override atribución HTML
-  tileSize?: number;         // default: 256
-  retina?: boolean;          // default: devicePixelRatio > 1 (solo temas que lo soporten)
-  selectionBounds?: Bounds | null;
+  center?: LatLng;                         // Por defecto: { lat: -9.19, lon: -75.02 }
+  zoom?: number;                           // Por defecto: 5
+  minZoom?: number;                        // Por defecto: 2
+  maxZoom?: number;                        // Por defecto: 18
+  theme?: MapTheme;                        // Por defecto: 'dark'
+  markers?: MapMarker[];
+  interactive?: boolean;                   // Por defecto: true
+  attribution?: string;                    // Sobrescribe atribución HTML del tema
+  tileSize?: number;                       // Por defecto: 256
+  retina?: boolean;                        // Por defecto: window.devicePixelRatio > 1
+  selectionBounds?: Bounds | null;         // Caja geográfica resaltada
+  selectionPolygon?: LatLng[] | LatLng[][] | null; // Anillo o multianillo SVG
 }
 ```
 
-#### Métodos públicos
+#### Métodos principales
 
 | Método | Descripción |
 |--------|-------------|
-| `setTheme(theme: MapTheme)` | Cambia tema, recarga teselas, emite `theme-change` |
-| `getTheme(): MapTheme` | Tema actual |
-| `setAttribution(html?: string)` | Sobrescribe atribución |
-| `setView(view, { animate?, duration? })` | Centro + zoom (con/sin animación) |
-| `getView(): MapView` | `{ center, zoom }` actual |
-| `getBounds(): Bounds` | Bounds del viewport actual |
-| `flyTo(center, zoom?, duration?)` | Animación suave (ease-out cúbico) |
-| `fitBounds(bounds, padding?, animate?)` | Calcula zoom/centro para encajar bounds |
-| `zoomIn() / zoomOut()` | ±1 nivel con animación corta |
-| `panBy(dx, dy)` | Desplaza píxeles en plano de pantalla |
-| `setMarkers(markers: MapMarker[])` | Diffing por `id`: crea/actualiza/elimina |
-| `setSelected(id \| null)` | Resalta marcador (clase CSS `.selected`) |
-| `setSelectionBounds(bounds \| null)` | Dibuja/oculta rectángulo de selección |
-| `setInteractive(boolean)` | Activa/desactiva interacción + clase `.static` |
-| `project(lat, lon): Point` | Coordenadas geo → píxeles en contenedor |
-| `unproject(x, y): LatLng` | Píxeles → coordenadas geo |
-| `resize()` | Fuerza recálculo de tamaño (ResizeObserver interno) |
-| `destroy()` | Limpia DOM, listeners, timers, observers |
+| `setTheme(theme)` | Cambia la capa base y recarga las teselas; emite `theme-change` |
+| `getTheme()` | Devuelve el `MapTheme` activo |
+| `setAttribution(html?)` | Sobrescribe o restaura la atribución HTML |
+| `setView(view, { animate?, duration? })` | Posiciona cámara instantáneamente o mediante animación |
+| `getView()` | Retorna `{ center, zoom }` actuales |
+| `getBounds()` | Retorna el `Bounds` visible del viewport |
+| `flyTo(center, zoom?, duration?)` | Desplaza cámara con ease-out cúbico conservando teselas base |
+| `fitBounds(bounds, padding?, animate?)` | Calcula zoom entero y centro para encuadrar un área |
+| `zoomIn()` / `zoomOut()` | Acerca o aleja un nivel anclado al cursor (si está dentro del mapa) |
+| `panBy(dx, dy)` | Desplaza el mapa en píxeles de pantalla |
+| `setMarkers(markers)` | Sincroniza marcadores con diffing O(n) por `id` |
+| `setSelected(id \| null)` | Marca un marcador como seleccionado (`.selected`) |
+| `setSelectionBounds(bounds \| null)` | Muestra u oculta el rectángulo de selección |
+| `setSelectionPolygon(polygon \| null)` | Renderiza contorno SVG de uno o varios anillos geográficos |
+| `setInteractive(boolean)` | Activa o desactiva eventos de usuario (`.static`) |
+| `project(lat, lon)` / `unproject(x, y)` | Conversión entre coordenadas geográficas y píxeles locales |
+| `resize()` / `destroy()` | Recalcula dimensiones o libera nodos DOM, observers y listeners |
 
-#### Eventos (`map.on<K>(type, handler)`)
+#### Eventos (`map.on(type, handler)`)
 
-```ts
-type MapEventMap = {
-  move: ViewInfo;                    // cada frame durante pan/zoom
-  click: { lat, lon, screen };       // click en mapa (sin marcador)
-  'marker-click': { marker, screen };
-  'marker-hover': { marker \| null, screen \| null };
-  'zoom-end': ViewInfo;              // al terminar animación/zoom
-  'theme-change': { theme: MapTheme };
-};
-```
+| Evento | Payload | Cuándo se emite |
+|--------|---------|-----------------|
+| `move` | `ViewInfo` | En cada actualización de centro/zoom |
+| `zoom-end` | `ViewInfo` | Al finalizar una animación de zoom o `setView` |
+| `click` | `{ lat, lon, screen }` | Clic en el lienzo fuera de marcadores |
+| `marker-click` | `{ marker, screen }` | Clic sobre un marcador |
+| `marker-hover` | `{ marker \| null, screen \| null }` | Entrada/salida del puntero sobre un marcador |
+| `theme-change` | `{ theme }` | Tras cambiar de capa base |
 
-`ViewInfo` extiende `MapView` con `bounds`, `width`, `height`.
+---
 
-### Temas
+## Temas integrados (sin API key)
 
-```ts
-export const MAP_THEMES: MapTheme[] = ['dark', 'voyager', 'light', 'satellite'];
+Orden en `MAP_THEMES`: `['voyager', 'light', 'satellite', 'dark']`.
 
-export const THEME_META: Record<MapTheme, ThemeMeta> = {
-  dark: { label: 'Topográfico', attribution: '...', dark: false, retina: false },
-  voyager: { label: 'Estándar', attribution: '...', dark: false, retina: false },
-  light: { label: 'Claro (OSM DE)', attribution: '...', dark: false, retina: false },
-  satellite: { label: 'Satélite', attribution: '...', dark: true, retina: false },
-};
-```
+| Clave | Etiqueta | Proveedor | Subdominios |
+|-------|----------|-----------|-------------|
+| `voyager` | Estándar | OpenStreetMap Standard | `a`, `b`, `c` |
+| `light` | Claro (OSM DE) | OpenStreetMap DE | `a`, `b`, `c` |
+| `satellite` | Satélite | Esri World Imagery | — |
+| `dark` | Topográfico | OpenTopoMap | `a`, `b`, `c` |
 
-Puedes extender `THEMES` y `THEME_META` para añadir proveedores propios (ej. MapTiler con API key, Stadia Maps, etc.).
+---
 
-### Utilidades Mercator (`mercator.ts`)
+## Utilidades Mercator (`mercator.ts`)
 
 ```ts
 import {
-  TILE_SIZE,           // 256
-  MAX_LATITUDE,        // 85.0511287798066
-  clamp, clampLat, wrapLon,
-  lonToWorldX, latToWorldY,
-  worldXToLon, worldYToLat,
-  metersPerPixel,      // resolución en m/px a dado zoom/lat
-  zoomToFit,           // calcula zoom para encajar bounds en w×h
+  TILE_SIZE,
+  MAX_LATITUDE,
+  clamp,
+  clampLat,
+  wrapLon,
+  lonToWorldX,
+  latToWorldY,
+  worldXToLon,
+  worldYToLat,
+  metersPerPixel,
+  zoomToFit,
 } from '@sismos/geomap';
 ```
 
-### Tipos
+---
 
-```ts
-type MapTheme = 'dark' | 'voyager' | 'light' | 'satellite';
+## Clases CSS (`TileMap.module.css`)
 
-interface LatLng { lat: number; lon: number; }
-interface Point { x: number; y: number; }
-interface Bounds { minLat, maxLat, minLon, maxLon: number; }
-interface MapView { center: LatLng; zoom: number; }
+- `.map` — contenedor raíz (`isolation: isolate`, `touch-action: none`, `user-select: none`)
+- `.tiles` / `.tileLevel` / `.tile` / `.loaded` — capas multizoom de teselas ráster
+- `.overlays` / `.selectionSvg` / `.selectionPath` / `.selection` — superposiciones vectoriales
+- `.markers` / `.markerWrap` / `.marker` / `.dot` / `.ring` / `.pulse` / `.selected` / `.markerLabel` — marcadores interactivos
+- `.scale` / `.scaleBar` / `.scaleLabel` — barra métrica de escala
+- `.attribution` — bloque inferior derecho de atribución
+- `.static` / `.dragging` — estados de interacción del mapa
 
-interface MapMarker {
-  id: string;
-  lat: number; lon: number;
-  magnitude?: number;
-  color?: string;        // default: magnitudeColor(magnitude)
-  size?: number;         // 10–30 px
-  label?: string;        // ej. "6.7"
-  pulse?: boolean;       // anillo animado
-  title?: string;        // tooltip
-  data?: unknown;        // payload arbitrario
-}
-```
-
-## CSS / Estilos
-
-El componente usa **CSS Modules** (`TileMap.module.css`). Clases clave:
-
-- `.map` — contenedor raíz (`position: relative`, `touch-action: none`)
-- `.tiles` — capa de teselas (`transform: translate3d() scale()`)
-- `.markers` — capa de marcadores
-- `.overlays` — capa de selección (bounds)
-- `.scale` / `.scaleBar` / `.scaleLabel` — barra de escala
-- `.attribution` — atribución HTML (bottom-right)
-- `.tile` — `<img>` individual (`.loaded` cuando completa)
-- `.markerWrap` — wrapper por marcador (`translate3d`)
-- `.markerBtn` — botón del marcador (accesible, `aria-label`)
-- `.markerPulse` — anillo animado (keyframes `pulse`)
-- `.selection` — rectángulo de selección (stroke amarillo/ámbar)
-- `.static` — clase en root cuando `interactive=false`
-
-Para usar sin CSS Modules, extrae el CSS compilado (Vite lo inyecta) o copia el archivo `.module.css` renombrando las clases hash a nombres semánticos.
-
-## Rendimiento y límites
-
-- **Teselas**: se crean/destruyen solo las que entran/salen del viewport (`syncTiles`). Limpieza automática en `clearTiles()`.
-- **Marcadores**: diffing O(n) por `id`; posición recalculada solo en `render()` (zoom/pan).
-- **Zoom fraccional**: renderiza en `z = round(zoom)` y escala con `scale = 2^(zoom - z)` → transiciones fluidas sin recargar teselas en cada frame.
-- **Memoria**: `maxEvents` en feed sísmico (default 3000/4000) evita crecimiento ilimitado.
-- **Subdominios**: configurados por tema (`THEME_SUBDOMAINS`) para evitar `d.tile.openstreetmap.org` que falla.
-
-## Proveedores de teselas (sin API key)
-
-| Tema | Proveedor | URL base | Subdominios | Retina |
-|------|-----------|----------|-------------|--------|
-| `dark` | OpenTopoMap | `https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png` | a,b,c | No |
-| `voyager` | OSM Standard | `https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png` | a,b,c | No |
-| `light` | OSM DE | `https://{s}.tile.openstreetmap.de/tiles/osmde/{z}/{x}/{y}.png` | a,b,c | No |
-| `satellite` | Esri World Imagery | `https://server.arcgisonline.com/.../tile/{z}/{y}/{x}` | — | No |
-
-> **Nota**: La especificación original usaba CARTO (`basemaps.cartocdn.com`) que ahora requiere API key para teselas ráster. Este paquete migra a proveedores gratuitos y abiertos. Los estilos vectoriales de CARTO para MapLibre GL siguen sin clave, pero este motor es solo ráster.
+---
 
 ## Licencia
 
-MIT
+MIT — Autor: **Edison Manrique Chocce**

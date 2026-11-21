@@ -174,11 +174,13 @@ export default function MapPanel() {
       (id) => {
         const instance = map();
         if (!instance || !id) return;
-        const event = app.events().find((item) => item.id === id);
+        const event =
+          app.events().find((item) => item.id === id) ??
+          app.snapshot().events.find((item) => item.id === id);
         if (!event) return;
         instance.flyTo(
           { lat: event.lat, lon: event.lon },
-          Math.max(instance.getView().zoom, 6),
+          Math.max(Math.round(instance.getView().zoom), 6),
           850,
         );
       },
@@ -187,7 +189,7 @@ export default function MapPanel() {
   );
 
   const zoomTo = (event: { lat: number; lon: number }) => {
-    map()?.flyTo(event, Math.max(map()?.getView().zoom ?? 6, 9), 700);
+    map()?.flyTo(event, Math.max(Math.round(map()?.getView().zoom ?? 6), 10), 700);
   };
 
   return (

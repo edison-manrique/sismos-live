@@ -12,9 +12,15 @@ function cleanAlert(value: unknown): EarthquakeEvent['alert'] {
     : null;
 }
 
-function emscUrl(unid: string): string | undefined {
-  if (!unid) return undefined;
-  return `https://www.emsc-csem.org/Earthquake/earthquake.php?id=${encodeURIComponent(unid)}`;
+function emscUrl(sourceId: string | undefined, unid: string): string | undefined {
+  const numericId = sourceId?.trim();
+  if (numericId && /^\d+$/.test(numericId)) {
+    return `https://www.emsc-csem.org/Earthquake_information/earthquake.php?id=${encodeURIComponent(numericId)}`;
+  }
+  if (unid && !unid.includes(':')) {
+    return `https://www.seismicportal.eu/eventdetails.html?unid=${encodeURIComponent(unid)}`;
+  }
+  return undefined;
 }
 
 /**
@@ -35,7 +41,8 @@ export function fromEmscMessage(message: EmscMessage): EarthquakeEvent | null {
   if (lat === null || lon === null || magnitude === null) return null;
   if (!Number.isFinite(timestamp)) return null;
 
-  const unid = String(props.unid ?? feature.id ?? props.source_id ?? `${lat}:${lon}:${timestamp}`);
+  const sourceId = props.source_id != null ? String(props.source_id) : undefined;
+  const unid = String(props.unid ?? feature.id ?? sourceId ?? `${lat}:${lon}:${timestamp}`);
   const updated = props.lastupdate ? Date.parse(props.lastupdate) : NaN;
   const depth = finite(props.depth) ?? finite(coords[2]) ?? 0;
   const place = String(props.flynn_region ?? props.region ?? 'Evento sísmico');
@@ -55,7 +62,7 @@ export function fromEmscMessage(message: EmscMessage): EarthquakeEvent | null {
     magType: typeof props.magtype === 'string' ? props.magtype : undefined,
     alert: null,
     tsunami: false,
-    url: emscUrl(unid),
+    url: emscUrl(sourceId, unid),
     agency: typeof props.auth === 'string' && props.auth.trim() ? props.auth.trim() : undefined,
     status: typeof props.evtype === 'string' && props.evtype === 'ke' ? 'confirmado' : undefined,
   };

@@ -366,9 +366,15 @@ function createAppState(): AppState {
 
   const stats = createMemo<FeedStats>(() => computeStats(events(), now()));
 
-  const selected = createMemo<EarthquakeEvent | null>(
-    () => events().find((event) => event.id === selectedId()) ?? null,
-  );
+  const selected = createMemo<EarthquakeEvent | null>(() => {
+    const id = selectedId();
+    if (!id) return null;
+    return (
+      events().find((event) => event.id === id) ??
+      snapshot().events.find((event) => event.id === id) ??
+      null
+    );
+  });
 
   const isLive = createMemo(() => snapshot().connection === 'open');
 

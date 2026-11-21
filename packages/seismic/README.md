@@ -1,55 +1,66 @@
 # @sismos/seismic
 
-Librería de datos sísmicos en tiempo real para **EMSC (WebSocket)** y **USGS (REST)**. Proporciona normalización, filtrado en cliente, estadísticas y un feed reactivo unificado.
+Librería TypeScript para consumo y normalización de actividad sísmica en tiempo real desde **EMSC (WebSocket)** y **USGS (REST GeoJSON)**. Incluye feed reactivo unificado, filtrado espacial por polígono o bounding box, utilidades de límites geográficos de Perú, telemetría sísmica extendida y estadísticas agregadas.
 
-## Características
+---
 
-- **EMSC WebSocket**: Conexión a `wss://www.seismicportal.eu/standing_order/websocket` con keep-alive `ping` cada 15 s, reconexión exponencial con jitter y deduplicación por `properties.unid`.
-- **USGS REST**: Cliente para `https://earthquake.usgs.gov/fdsnws/event/1/query` (GeoJSON, CORS), con soporte para ventanas temporales, bounding boxes, magnitud y paginación.
-- **Normalización unificada**: Ambos orígenes se convierten a `EarthquakeEvent` (timestamp en epoch ms, coordenadas, magnitud, lugar, alerta, tsunami, URL oficial).
-- **Feed reactivo (`EarthquakeFeed`)**: Carga inicial USGS + streaming EMSC, upsert por `id`, filtrado en memoria (`EventFilter`), estadísticas agregadas (`FeedStats`) y snapshot inmutable (`FeedSnapshot`).
-- **Utilidades**: Formateo (magnitud, coordenadas, profundidad, tiempo relativo, reloj), paleta de colores sísmica, buckets de magnitud, ordenación, coincidencia de filtros, bounding boxes (Perú por defecto, mundo).
+## Características principales
 
-## Instalación
+- **EMSC WebSocket (`EmscSocket`)**: conexión persistente a `wss://www.seismicportal.eu/standing_order/websocket` con *keep-alive* `ping` cada 15 s, reconexión exponencial con jitter y generación automática de enlace oficial EMSC a partir de `properties.source_id` (con respaldo a SeismicPortal por `unid`).
+- **USGS REST (`fetchUsgsEvents`)**: consulta directa al endpoint FDSN (`https://earthquake.usgs.gov/fdsnws/event/1/query`) con soporte para ventana temporal, magnitud mínima, caja geográfica y paginación.
+- **Normalización unificada (`EarthquakeEvent`)**: combina metadatos básicos (magnitud, escala, profundidad, coordenadas, timestamp, alerta PAGER, tsunami) con telemetría avanzada (`status`, `agency`, `felt`, `cdi`, `mmi`, `significance`, `stations`, `gap`, `rms`, `nearestStationKm`).
+- **Feed reactivo (`EarthquakeFeed`)**: sincronización inicial USGS + streaming EMSC + polling de respaldo configurable cuando el socket no está abierto, con control máximo de memoria (`maxEvents`).
+- **Límites geográficos de Perú (`peruBorder.ts` + `utils.ts`)**: obtención de fronteras terrestres reales sin API key (**geoBoundaries** y **OpenDataSoft** con caché en `localStorage`) separadas del polígono de cobertura marítima (Nominatim / respaldo local) para capturar sismos de subducción costera sin invadir países vecinos.
+
+---
+
+## Instalación e importación
 
 ```bash
-# Desde el monorepo (pnpm/npm workspaces)
 npm install @sismos/seismic
 ```
-
-Uso directo en código (source-first, sin build intermedio):
 
 ```ts
 import {
   EarthquakeFeed,
   PERU_BOUNDS,
+  PERU_SEISMIC_POLYGON,
+  fetchPeruBoundaries,
   type EarthquakeEvent,
   type EventFilter,
 } from '@sismos/seismic';
 ```
 
+---
+
 ## Uso rápido
 
 ```ts
 const feed = new EarthquakeFeed({
-  filter: { bounds: PERU_BOUNDS, minMagnitude: 2.5 },
+  filter: { polygon: PERU_SEISMIC_POLYGON, minMagnitude: 2.5 },
   usgs: { minMagnitude: 2.5, limit: 1500, orderBy: 'time' },
   usgsDays: 7,
   maxEvents: 4000,
-  pollInterval: 90_000, // polling USGS mientras WS caído
+  pollInterval: 90_000,
 });
 
-feed.subscribe((snapshot) => {
-  console.log(`${snapshot.events.length} eventos filtrados`);
-  console.log(`Total en memoria: ${snapshot.total}`);
-  console.log(`Conexión EMSC: ${snapshot.connection}`);
+const unsubscribe = feed.subscribe((snapshot) => {
+  console.log(`${snapshot.events.length} eventos filtrados de ${snapshot.total} en memoria`);
+  console.log(`Estado EMSC: ${snapshot.connection}`);
 });
 
 feed.start();
-// ... más tarde
-feed.stop();
+
+// Cargar límites terrestres exactos desde APIs públicas abiertas
+const boundaries = await fetchPeruBoundaries();
+feed.setFilter({ polygon: boundaries.seismicPolygon });
+
+// Al desmontar
+unsubscribe();
 feed.destroy();
 ```
+
+---
 
 ## API principal
 
@@ -58,66 +69,56 @@ feed.destroy();
 ```ts
 interface FeedOptions {
   filter?: EventFilter;
-  usgs?: UsgsQueryOptions | false;  // false desactiva carga inicial
-  usgsDays?: number;                // default 7
-  emscUrl?: string | null | false;  // null/false desactiva live
-  pingInterval?: number;            // default 15000
-  maxEvents?: number;               // default 3000
-  pollInterval?: number;            // default 90000 (0 desactiva)
+  usgs?: UsgsQueryOptions | false;
+  usgsDays?: number;                // Por defecto: 7
+  emscUrl?: string | null | false;
+  pingInterval?: number;            // Por defecto: 15000 ms
+  maxEvents?: number;               // Por defecto: 3000
+  pollInterval?: number;            // Por defecto: 90000 ms (0 desactiva)
   fetchImpl?: typeof fetch;
   WebSocketImpl?: typeof WebSocket;
-  onSnapshot?: (s: FeedSnapshot) => void;
-  onEvent?: (e: EarthquakeEvent, meta: FeedEventMeta) => void;
+  onSnapshot?: (snapshot: FeedSnapshot) => void;
+  onEvent?: (event: EarthquakeEvent, meta: FeedEventMeta) => void;
 }
 ```
 
-Métodos:
+Métodos principales:
 - `subscribe(listener) => () => void`
-- `start(): void`
-- `stop(): void`
-- `destroy(): void`
+- `start()` / `stop()` / `destroy()`
 - `refresh(): Promise<void>`
-- `setFilter(partial: EventFilter): void`
-- `getFilter(): EventFilter`
+- `setFilter(partial: EventFilter)` / `getFilter(): EventFilter`
 - `getSnapshot(): FeedSnapshot`
 - `getAllEvents(): EarthquakeEvent[]`
 
-### `EmscSocket`
-
-Cliente WebSocket de bajo nivel (uso directo si no necesitas feed unificado).
+### `EmscSocket` y `fetchUsgsEvents`
 
 ```ts
 const socket = new EmscSocket({
   url: 'wss://www.seismicportal.eu/standing_order/websocket',
   pingInterval: 15_000,
   maxReconnectDelay: 30_000,
-  onEvent: (event, action) => { /* create | update */ },
-  onStatus: (status, detail) => { /* idle | connecting | open | reconnecting | closed | error */ },
-  onError: (err) => { },
+  onEvent: (event, action) => console.log(action, event),
+  onStatus: (status, detail) => console.log(status, detail),
 });
 socket.connect();
-socket.close();
-```
 
-Propiedades:
-- `status: ConnectionStatus`
-- `isOpen: boolean`
-- `reconnectAttempt: number`
-
-### `fetchUsgsEvents` / `buildUsgsUrl`
-
-```ts
-const result = await fetchUsgsEvents({
+const usgsResult = await fetchUsgsEvents({
   startTime: Date.now() - 7 * 86_400_000,
   minMagnitude: 2.5,
   bounds: PERU_BOUNDS,
   limit: 1500,
   orderBy: 'time',
 });
-// result: { events: EarthquakeEvent[], url: string, fetchedAt: number }
 ```
 
-### Tipos exportados
+### `fetchPeruBoundaries` / `loadCachedPeruBoundaries`
+
+- `loadCachedPeruBoundaries(): PeruBoundaries | null` — lectura síncrona desde caché local (`localStorage`).
+- `fetchPeruBoundaries(options?: { signal?: AbortSignal; fetchImpl?: typeof fetch }): Promise<PeruBoundaries>` — consulta **geoBoundaries** y **OpenDataSoft** para contorno terrestre (`visualRings`), y **Nominatim** para polígono sísmico costero (`seismicPolygon`), con respaldo local (`PERU_POLYGON` y `PERU_SEISMIC_POLYGON`).
+
+---
+
+## Modelos de datos
 
 ```ts
 type EarthquakeSource = 'EMSC' | 'USGS';
@@ -132,7 +133,7 @@ interface EarthquakeEvent {
   lat: number;
   lon: number;
   depth: number;
-  timestamp: number;      // epoch ms
+  timestamp: number;
   updatedAt: number;
   source: EarthquakeSource;
   sourceCatalog?: string;
@@ -140,6 +141,16 @@ interface EarthquakeEvent {
   alert: AlertLevel | null;
   tsunami: boolean;
   url?: string;
+  status?: string;
+  agency?: string;
+  felt?: number | null;
+  cdi?: number | null;
+  mmi?: number | null;
+  significance?: number | null;
+  stations?: number | null;
+  gap?: number | null;
+  rms?: number | null;
+  nearestStationKm?: number | null;
 }
 
 interface EventFilter {
@@ -148,53 +159,32 @@ interface EventFilter {
   since?: number | null;
   until?: number | null;
   bounds?: Bounds | null;
+  polygon?: LatLng[] | null;
   sources?: EarthquakeSource[] | null;
   search?: string;
 }
-
-interface FeedSnapshot {
-  events: EarthquakeEvent[];        // ya filtrados y ordenados (time desc)
-  total: number;                    // en memoria (sin filtrar)
-  filter: EventFilter;
-  stats: FeedStats;
-  connection: ConnectionStatus;
-  lastEventAt: number | null;
-  lastSyncAt: number | null;
-  loading: boolean;
-  reconnectAttempt: number;
-  error: string | null;
-}
 ```
 
-### Utilidades de formato y colores
+---
 
-```ts
-import {
-  formatMagnitude,    // "4.8"
-  formatCoords,       // "9.19°S, 75.02°W"
-  formatDepth,        // "108 km"
-  formatDateTime,     // "2024-01-15 14:32:05"
-  formatClock,        // "14:32"
-  formatNumber,       // "1,234"
-  timeAgo,            // "hace 5 min"
-  magnitudeColor,     // "#ff8a3d"
-  magnitudeRadius,    // px para marcador
-  magnitudeBucket,    // { label, min, max, color }
-  PERU_BOUNDS,        // { minLat: -18.5, maxLat: 0, minLon: -81.5, maxLon: -68.5 }
-  WORLD_BOUNDS,
-  matchesFilter,
-  sortByTimeDesc,
-  sortByMagnitudeDesc,
-  computeStats,
-} from '@sismos/seismic';
-```
+## Utilidades exportadas (`utils.ts`)
 
-## Notas de endpoints
+| Grupo | Símbolos |
+|-------|----------|
+| **Geografía** | `PERU_BOUNDS` (`-18.4..-0.05`, `-81.4..-68.6`), `PERU_POLYGON`, `PERU_SEISMIC_POLYGON`, `WORLD_BOUNDS`, `isWithinBounds`, `isPointInPolygon`, `boundsCenter`, `boundsSpan`, `boundsOfEvents` |
+| **Filtrado y orden** | `matchesFilter`, `sortByTimeDesc`, `sortByMagnitudeDesc`, `computeStats` |
+| **Magnitud y color** | `MAGNITUDE_COLORS`, `MAGNITUDE_BUCKETS`, `magnitudeColor`, `magnitudeRadius`, `bucketForMagnitude` |
+| **Formateo (`es-PE`)** | `formatMagnitude`, `formatDepth`, `formatCoords`, `formatDateTime`, `formatClock`, `formatNumber`, `timeAgo` |
 
-- **EMSC**: `wss://www.seismicportal.eu/standing_order/websocket` — eventos globales sin filtro servidor; el filtrado geográfico/magnitud es cliente.
-- **USGS**: `https://earthquake.usgs.gov/fdsnws/event/1/query` — endpoint FDSN oficial con CORS. La especificación original mostraba `https://usgs.govquery` como placeholder; este es el endpoint real.
-- **Timestamps**: EMSC envía ISO 8601 en `properties.time`; USGS envía epoch ms en `properties.time`. La librería normaliza todo a epoch ms (`number`).
+---
+
+## Notas técnicas
+
+- **Fichas oficiales EMSC**: `fromEmscMessage` construye `https://www.emsc-csem.org/Earthquake_information/earthquake.php?id=<source_id>` cuando `properties.source_id` es numérico, evitando enlaces rotos basados en `unid`, y usa `https://www.seismicportal.eu/eventdetails.html?unid=<unid>` únicamente como respaldo.
+- **Normalización temporal**: EMSC entrega timestamps ISO 8601 y USGS entrega epoch en milisegundos; toda la librería trabaja en epoch ms (`number`).
+
+---
 
 ## Licencia
 
-MIT
+MIT — Autor: **Edison Manrique Chocce**
