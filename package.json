@@ -8,15 +8,21 @@
     "apps/*"
   ],
   "scripts": {
-    "dev": "vite --config apps/web/vite.config.ts",
+    "dev": "vite --config apps/web/vite.config.ts --host 0.0.0.0 --port 3000",
     "build": "vite build --config apps/web/vite.config.ts",
     "preview": "vite preview --config apps/web/vite.config.ts",
-    "typecheck": "tsc -p packages/seismic/tsconfig.json && tsc -p packages/geomap/tsconfig.json && tsc -p apps/web/tsconfig.json"
+    "typecheck": "tsc -p packages/seismic/tsconfig.json && tsc -p packages/geomap/tsconfig.json && tsc -p apps/web/tsconfig.json",
+    "lint": "npm run typecheck"
   },
   "devDependencies": {
     "typescript": "^5.9.2"
   },
   "engines": {
     "node": ">=20.19"
+  },
+  "dependencies": {
+    "solid-js": "^1.9.20",
+    "vite": "^7.3.8",
+    "vite-plugin-solid": "^2.11.17"
   }
 }

@@ -19,8 +19,9 @@ export default defineConfig(({ mode }) => {
       },
     },
     server: {
-      port: 5173,
-      host: true,
+      port: 3000,
+      host: '0.0.0.0',
+      allowedHosts: true,
     },
     preview: {
       port: 4173,

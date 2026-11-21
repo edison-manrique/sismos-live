@@ -30,7 +30,7 @@ function SidebarFooter() {
           {app.snapshot().lastSyncAt ? formatClock(app.snapshot().lastSyncAt!) : '—'}
         </span>
         <span class={styles.footerNote}>
-          {app.filters.region === 'peru' ? 'BBox Perú' : 'Global'}
+          {app.filters.region === 'peru' ? 'Límites Perú' : 'Global'}
         </span>
       </div>
     </footer>

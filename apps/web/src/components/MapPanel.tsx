@@ -1,6 +1,7 @@
 import { For, Show, createEffect, createMemo, createSignal, on, onCleanup, onMount } from 'solid-js';
 import {
   PERU_BOUNDS,
+  PERU_POLYGON,
   WORLD_BOUNDS,
   formatCoords,
   formatDateTime,
@@ -50,9 +51,9 @@ export default function MapPanel() {
       lon: event.lon,
       magnitude: event.magnitude,
       color: magnitudeColor(event.magnitude),
-      size: magnitudeRadius(event.magnitude, 7, 2.3),
-      label: event.magnitude >= 4 ? formatMagnitude(event.magnitude) : undefined,
-      pulse: event.magnitude >= 4.5 && Date.now() - event.timestamp < 20 * 60_000,
+      size: Math.max(19, magnitudeRadius(event.magnitude, 13, 2.5)),
+      label: formatMagnitude(event.magnitude),
+      pulse: event.magnitude >= 4.5 && app.now() - event.timestamp < 20 * 60_000,
       title: `M${formatMagnitude(event.magnitude)} · ${event.place}`,
       data: event.id,
     })),
@@ -66,13 +67,13 @@ export default function MapPanel() {
     const instance = map();
     if (!event || !info || !instance) return null;
     const point = instance.project(event.lat, event.lon);
-    const width = 312;
+    const width = 344;
     const half = width / 2 + 14;
     return {
       event,
       x: clamp(point.x, half, Math.max(half, info.width - half)),
       y: clamp(point.y, 12, Math.max(12, info.height - 12)),
-      below: point.y < 300,
+      below: point.y < 360,
     };
   });
 
@@ -85,7 +86,7 @@ export default function MapPanel() {
       zoom: 5,
       minZoom: 2,
       maxZoom: 17,
-      selectionBounds: app.bounds(),
+      selectionPolygon: app.filters.region === 'peru' ? PERU_POLYGON : null,
     });
 
     instance.on('move', (info) => setView(info));
@@ -116,14 +117,14 @@ export default function MapPanel() {
     if (instance) instance.setSelected(app.selectedId());
   });
 
-  // Al cambiar de región, encuadra y ajusta la caja resaltada.
+  // Al cambiar de región, encuadra y ajusta el límite geográfico resaltado.
   createEffect(
     on(
       () => app.filters.region,
       (region) => {
         const instance = map();
         if (!instance) return;
-        instance.setSelectionBounds(region === 'peru' ? PERU_BOUNDS : null);
+        instance.setSelectionPolygon(region === 'peru' ? PERU_POLYGON : null);
         instance.fitBounds(region === 'peru' ? PERU_BOUNDS : WORLD_BOUNDS, region === 'peru' ? 48 : 22, true);
       },
       { defer: true },
@@ -254,7 +255,9 @@ export default function MapPanel() {
         <button
           type="button"
           class={styles.controlBtn}
-          onClick={() => map()?.fitBounds(regionBounds(), 48, true)}
+          onClick={() =>
+            map()?.fitBounds(regionBounds(), app.filters.region === 'peru' ? 48 : 22, true)
+          }
           title="Recentrar en la región"
           aria-label="Recentrar en la región"
         >
@@ -302,6 +305,45 @@ export default function MapPanel() {
       <Show when={popup()}>
         {(data) => {
           const event = () => data().event;
+          const depthClass = () => {
+            const d = event().depth;
+            if (!Number.isFinite(d)) return null;
+            if (d < 70) return 'Superficial';
+            if (d <= 300) return 'Intermedio';
+            return 'Profundo';
+          };
+          const statusLabel = () => {
+            const s = event().status?.toLowerCase();
+            if (!s) return null;
+            if (s === 'reviewed') return 'Revisado';
+            if (s === 'automatic') return 'Automático';
+            if (s === 'confirmado') return 'Confirmado';
+            return event().status;
+          };
+          const alertLabel = () => {
+            switch (event().alert) {
+              case 'green':
+                return 'Verde';
+              case 'yellow':
+                return 'Amarilla';
+              case 'orange':
+                return 'Naranja';
+              case 'red':
+                return 'Roja';
+              default:
+                return 'Sin alerta';
+            }
+          };
+          const hasTelemetry = () =>
+            event().felt != null ||
+            event().mmi != null ||
+            event().cdi != null ||
+            event().stations != null ||
+            event().gap != null ||
+            event().rms != null ||
+            event().nearestStationKm != null ||
+            event().significance != null;
+
           return (
             <article
               class={styles.popup}
@@ -323,7 +365,7 @@ export default function MapPanel() {
                   style={`--mag-color:${magnitudeColor(event().magnitude)}`}
                 >
                   {formatMagnitude(event().magnitude)}
-                  <small>M</small>
+                  <small>{event().magType ? event().magType!.toUpperCase() : 'M'}</small>
                 </span>
                 <div class={styles.popupTitle}>
                   <strong class={styles.popupPlace}>{event().place}</strong>
@@ -331,32 +373,91 @@ export default function MapPanel() {
                     {timeAgo(event().timestamp, app.now())} ·{' '}
                     {formatDateTime(event().timestamp)}
                   </span>
+                  <div class={styles.popupBadges}>
+                    <span class={styles.popupBadge} data-source={event().source}>
+                      {event().source}
+                      {event().agency ? ` · ${event().agency}` : ''}
+                    </span>
+                    <Show when={statusLabel()}>
+                      <span class={styles.popupBadge}>{statusLabel()}</span>
+                    </Show>
+                    <Show when={event().sourceCatalog}>
+                      <span class={styles.popupBadge}>{event().sourceCatalog}</span>
+                    </Show>
+                  </div>
                 </div>
               </header>
 
               <div class={styles.popupGrid}>
                 <div>
                   <span>Profundidad</span>
-                  <strong>{formatDepth(event().depth)}</strong>
+                  <strong>
+                    {formatDepth(event().depth)}
+                    {depthClass() ? ` · ${depthClass()}` : ''}
+                  </strong>
                 </div>
                 <div>
                   <span>Coordenadas</span>
                   <strong>{formatCoords(event().lat, event().lon)}</strong>
                 </div>
                 <div>
-                  <span>Fuente</span>
-                  <strong>
-                    {event().source}
-                    {event().magType ? ` · ${event().magType}` : ''}
+                  <span>Alerta PAGER</span>
+                  <strong class={styles.popupAlert} data-alert={event().alert ?? undefined}>
+                    {alertLabel()}
                   </strong>
                 </div>
                 <div>
-                  <span>Alerta</span>
-                  <strong class={styles.popupAlert} data-alert={event().alert ?? undefined}>
-                    {event().alert ?? 'Sin alerta'}
-                  </strong>
+                  <span>Actualizado</span>
+                  <strong>{timeAgo(event().updatedAt, app.now())}</strong>
                 </div>
               </div>
+
+              <Show when={hasTelemetry()}>
+                <div class={styles.popupTelemetry}>
+                  <Show when={event().mmi != null || event().cdi != null}>
+                    <div>
+                      <span>Intensidad</span>
+                      <strong>
+                        {event().mmi != null ? `MMI ${event().mmi!.toFixed(1)}` : ''}
+                        {event().mmi != null && event().cdi != null ? ' · ' : ''}
+                        {event().cdi != null ? `CDI ${event().cdi!.toFixed(1)}` : ''}
+                      </strong>
+                    </div>
+                  </Show>
+                  <Show when={event().felt != null}>
+                    <div>
+                      <span>Reportes ("Lo sentí")</span>
+                      <strong>{event().felt} personas</strong>
+                    </div>
+                  </Show>
+                  <Show when={event().stations != null || event().gap != null}>
+                    <div>
+                      <span>Red / Brecha</span>
+                      <strong>
+                        {event().stations != null ? `${event().stations} est.` : '—'}
+                        {event().gap != null ? ` · ${Math.round(event().gap!)}°` : ''}
+                      </strong>
+                    </div>
+                  </Show>
+                  <Show when={event().rms != null || event().nearestStationKm != null}>
+                    <div>
+                      <span>RMS / Est. cercana</span>
+                      <strong>
+                        {event().rms != null ? `${event().rms!.toFixed(2)} s` : '—'}
+                        {event().nearestStationKm != null
+                          ? ` · ${event().nearestStationKm} km`
+                          : ''}
+                      </strong>
+                    </div>
+                  </Show>
+                  <Show when={event().significance != null}>
+                    <div>
+                      <span>Relevancia</span>
+                      <strong>{event().significance} pts</strong>
+                    </div>
+                  </Show>
+                </div>
+              </Show>
 
               <Show when={event().tsunami}>
                 <div class={styles.tsunami}>

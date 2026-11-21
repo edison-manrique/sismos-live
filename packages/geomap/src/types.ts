@@ -69,4 +69,6 @@ export interface TileMapOptions {
   retina?: boolean;
   /** Caja resaltada (p. ej. el área filtrada). */
   selectionBounds?: Bounds | null;
+  /** Polígono resaltado (p. ej. límites de un país). */
+  selectionPolygon?: LatLng[] | null;
 }

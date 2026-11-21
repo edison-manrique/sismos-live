@@ -56,6 +56,8 @@ export function fromEmscMessage(message: EmscMessage): EarthquakeEvent | null {
     alert: null,
     tsunami: false,
     url: emscUrl(unid),
+    agency: typeof props.auth === 'string' && props.auth.trim() ? props.auth.trim() : undefined,
+    status: typeof props.evtype === 'string' && props.evtype === 'ke' ? 'confirmado' : undefined,
   };
 }
 
@@ -77,6 +79,7 @@ export function fromUsgsFeature(feature: UsgsFeature): EarthquakeEvent | null {
 
   const place = props.place?.trim() || 'Ubicación desconocida';
   const id = feature.id || `${lat}:${lon}:${timestamp}`;
+  const dmin = finite(props.dmin);
 
   return {
     id,
@@ -93,5 +96,15 @@ export function fromUsgsFeature(feature: UsgsFeature): EarthquakeEvent | null {
     alert: cleanAlert(props.alert),
     tsunami: props.tsunami === 1,
     url: typeof props.url === 'string' ? props.url : undefined,
+    status: typeof props.status === 'string' ? props.status : undefined,
+    agency: typeof props.net === 'string' && props.net.trim() ? props.net.toUpperCase() : undefined,
+    felt: finite(props.felt),
+    cdi: finite(props.cdi),
+    mmi: finite(props.mmi),
+    significance: finite(props.sig),
+    stations: finite(props.nst),
+    gap: finite(props.gap),
+    rms: finite(props.rms),
+    nearestStationKm: dmin !== null ? Math.round(dmin * 111.19) : null,
   };
 }

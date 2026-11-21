@@ -107,6 +107,7 @@ export class TileMap {
   private height = 1;
   private tileZoom = -1;
   private selectionBounds: Bounds | null = null;
+  private selectionPolygon: LatLng[] | null = null;
   private selectedId: string | null = null;
   private drag: DragState | null = null;
   private pinch: PinchState | null = null;
@@ -125,6 +126,7 @@ export class TileMap {
     this.retina =
       options.retina ?? (typeof window !== 'undefined' && window.devicePixelRatio > 1);
     this.selectionBounds = options.selectionBounds ?? null;
+    this.selectionPolygon = options.selectionPolygon ?? null;
 
     this.root = div(styles.map);
     this.root.tabIndex = 0;
@@ -314,6 +316,11 @@ export class TileMap {
     this.renderSelection();
   }
 
+  setSelectionPolygon(polygon: LatLng[] | null): void {
+    this.selectionPolygon = polygon;
+    this.renderSelection();
+  }
+
   setInteractive(interactive: boolean): void {
     this.interactive = interactive;
     this.root.classList.toggle(styles.static, !interactive);
@@ -454,6 +461,25 @@ export class TileMap {
 
   private renderSelection(): void {
     this.selectionLayer.replaceChildren();
+    if (this.selectionPolygon && this.selectionPolygon.length >= 3) {
+      const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      svg.setAttribute('class', styles.selectionSvg);
+      svg.setAttribute('viewBox', `0 0 ${this.width} ${this.height}`);
+      svg.setAttribute('width', String(this.width));
+      svg.setAttribute('height', String(this.height));
+
+      const coords = this.selectionPolygon.map((point) => {
+        const projected = this.project(point.lat, point.lon);
+        return `${projected.x.toFixed(1)},${projected.y.toFixed(1)}`;
+      });
+      const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      path.setAttribute('class', styles.selectionPath);
+      path.setAttribute('d', `M${coords.join('L')}Z`);
+      svg.appendChild(path);
+      this.selectionLayer.appendChild(svg);
+      return;
+    }
+
     if (!this.selectionBounds) return;
     const nw = this.project(this.selectionBounds.maxLat, this.selectionBounds.minLon);
     const se = this.project(this.selectionBounds.minLat, this.selectionBounds.maxLon);
@@ -577,7 +603,7 @@ export class TileMap {
     button.classList.toggle(styles.selected, this.selectedId === marker.id);
 
     label.textContent = marker.label ?? '';
-    const showLabel = Boolean(marker.label) && size >= 16;
+    const showLabel = Boolean(marker.label) && size >= 12;
     label.style.display = showLabel ? '' : 'none';
     dot.classList.toggle(styles.hasLabel, showLabel);
   }

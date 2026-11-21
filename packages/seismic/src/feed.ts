@@ -183,7 +183,7 @@ export class EarthquakeFeed {
     if (interval <= 0 || this.pollTimer != null) return;
     this.pollTimer = setInterval(() => {
       if (!this.started) return;
-      if (this.socket?.status !== 'open') void this.refresh();
+      void this.refresh();
     }, interval);
   }
 

@@ -4,16 +4,158 @@ import type {
   EarthquakeSource,
   EventFilter,
   FeedStats,
+  LatLng,
   MagnitudeBucket,
 } from './types.js';
 
-/** Bounding box por defecto (Perú), según la especificación del proyecto. */
+/** Bounding box ajustado de Perú para encuadre de cámara. */
 export const PERU_BOUNDS: Bounds = {
-  minLat: -18.5,
-  maxLat: 0,
-  minLon: -81.5,
-  maxLon: -68.5,
+  minLat: -18.4,
+  maxLat: -0.05,
+  minLon: -81.4,
+  maxLon: -68.6,
 };
+
+/**
+ * Polígono simplificado de los límites territoriales de Perú (fronteras terrestres + litoral).
+ * Ordenado en sentido horario empezando en Tumbes (frontera con Ecuador).
+ */
+export const PERU_POLYGON: LatLng[] = [
+  { lat: -3.41, lon: -80.28 }, // Boca de Capones / Zarumilla
+  { lat: -3.48, lon: -80.20 },
+  { lat: -3.85, lon: -80.18 },
+  { lat: -4.08, lon: -80.44 },
+  { lat: -4.44, lon: -80.22 },
+  { lat: -4.39, lon: -79.96 }, // Macará
+  { lat: -4.64, lon: -79.48 },
+  { lat: -5.02, lon: -79.01 }, // Río Canchis / San Ignacio
+  { lat: -4.60, lon: -78.55 },
+  { lat: -4.00, lon: -78.38 }, // Cordillera del Cóndor
+  { lat: -3.45, lon: -78.22 },
+  { lat: -3.00, lon: -77.82 }, // Río Santiago
+  { lat: -2.48, lon: -76.55 }, // Pastaza
+  { lat: -2.10, lon: -76.02 },
+  { lat: -1.62, lon: -75.85 }, // Tigre / Napo
+  { lat: -0.96, lon: -75.20 },
+  { lat: -0.10, lon: -75.24 }, // Güeppí
+  { lat: -0.35, lon: -74.65 },
+  { lat: -0.58, lon: -74.05 }, // Putumayo
+  { lat: -1.15, lon: -73.40 },
+  { lat: -1.58, lon: -72.80 },
+  { lat: -2.35, lon: -71.50 },
+  { lat: -2.78, lon: -70.45 },
+  { lat: -3.78, lon: -70.12 },
+  { lat: -4.22, lon: -69.94 }, // Santa Rosa / Trapecio Amazónico
+  { lat: -4.45, lon: -71.40 }, // Río Yavarí
+  { lat: -5.22, lon: -72.82 },
+  { lat: -6.15, lon: -73.20 },
+  { lat: -6.82, lon: -73.72 },
+  { lat: -7.38, lon: -73.96 }, // Sierra del Divisor
+  { lat: -8.32, lon: -73.15 },
+  { lat: -9.42, lon: -72.72 }, // Alto Juruá
+  { lat: -9.80, lon: -72.10 },
+  { lat: -9.75, lon: -70.62 },
+  { lat: -10.52, lon: -70.50 },
+  { lat: -10.95, lon: -69.57 }, // Iñapari / Río Acre
+  { lat: -11.90, lon: -69.05 },
+  { lat: -12.50, lon: -68.66 }, // Río Heath
+  { lat: -13.60, lon: -68.88 },
+  { lat: -14.55, lon: -69.12 },
+  { lat: -15.48, lon: -69.25 },
+  { lat: -16.18, lon: -68.92 }, // Lago Titicaca
+  { lat: -16.58, lon: -69.04 }, // Desaguadero
+  { lat: -17.49, lon: -69.47 }, // Tripartito
+  { lat: -17.95, lon: -69.85 },
+  { lat: -18.35, lon: -70.38 }, // Hito de la Concordia (Tacna)
+  { lat: -17.85, lon: -71.08 },
+  { lat: -17.65, lon: -71.36 }, // Ilo
+  { lat: -17.02, lon: -72.02 }, // Mollendo
+  { lat: -16.65, lon: -72.65 }, // Camaná
+  { lat: -16.25, lon: -73.60 }, // Atico
+  { lat: -15.80, lon: -74.35 }, // Chala
+  { lat: -15.35, lon: -75.16 }, // Marcona
+  { lat: -14.65, lon: -75.95 }, // Nazca litoral
+  { lat: -14.08, lon: -76.28 }, // Paracas
+  { lat: -13.70, lon: -76.22 }, // Pisco
+  { lat: -13.08, lon: -76.39 }, // Cañete
+  { lat: -12.05, lon: -77.16 }, // Callao / Lima
+  { lat: -11.12, lon: -77.61 }, // Huacho
+  { lat: -10.75, lon: -77.78 }, // Barranca
+  { lat: -10.07, lon: -78.16 }, // Huarmey
+  { lat: -9.10, lon: -78.58 }, // Chimbote
+  { lat: -8.12, lon: -79.05 }, // Trujillo
+  { lat: -7.40, lon: -79.58 }, // Pacasmayo
+  { lat: -6.90, lon: -79.88 }, // Chiclayo / Pimentel
+  { lat: -5.85, lon: -81.10 }, // Punta Aguja
+  { lat: -5.08, lon: -81.12 }, // Paita
+  { lat: -4.68, lon: -81.33 }, // Punta Pariñas
+  { lat: -4.10, lon: -81.08 }, // Máncora
+  { lat: -3.55, lon: -80.50 }, // Zorritos
+];
+
+/**
+ * Polígono de cobertura sísmica para Perú: mantiene las fronteras terrestres exactas
+ * con Ecuador, Colombia, Brasil, Bolivia y Chile, e incluye la franja marítima del Pacífico
+ * (~180 km mar adentro) para capturar sismos costeros/subducción frente al litoral peruano.
+ */
+export const PERU_SEISMIC_POLYGON: LatLng[] = [
+  { lat: -3.41, lon: -80.28 },
+  { lat: -3.48, lon: -80.20 },
+  { lat: -3.85, lon: -80.18 },
+  { lat: -4.08, lon: -80.44 },
+  { lat: -4.44, lon: -80.22 },
+  { lat: -4.39, lon: -79.96 },
+  { lat: -4.64, lon: -79.48 },
+  { lat: -5.02, lon: -79.01 },
+  { lat: -4.60, lon: -78.55 },
+  { lat: -4.00, lon: -78.38 },
+  { lat: -3.45, lon: -78.22 },
+  { lat: -3.00, lon: -77.82 },
+  { lat: -2.48, lon: -76.55 },
+  { lat: -2.10, lon: -76.02 },
+  { lat: -1.62, lon: -75.85 },
+  { lat: -0.96, lon: -75.20 },
+  { lat: -0.10, lon: -75.24 },
+  { lat: -0.35, lon: -74.65 },
+  { lat: -0.58, lon: -74.05 },
+  { lat: -1.15, lon: -73.40 },
+  { lat: -1.58, lon: -72.80 },
+  { lat: -2.35, lon: -71.50 },
+  { lat: -2.78, lon: -70.45 },
+  { lat: -3.78, lon: -70.12 },
+  { lat: -4.22, lon: -69.94 },
+  { lat: -4.45, lon: -71.40 },
+  { lat: -5.22, lon: -72.82 },
+  { lat: -6.15, lon: -73.20 },
+  { lat: -6.82, lon: -73.72 },
+  { lat: -7.38, lon: -73.96 },
+  { lat: -8.32, lon: -73.15 },
+  { lat: -9.42, lon: -72.72 },
+  { lat: -9.80, lon: -72.10 },
+  { lat: -9.75, lon: -70.62 },
+  { lat: -10.52, lon: -70.50 },
+  { lat: -10.95, lon: -69.57 },
+  { lat: -11.90, lon: -69.05 },
+  { lat: -12.50, lon: -68.66 },
+  { lat: -13.60, lon: -68.88 },
+  { lat: -14.55, lon: -69.12 },
+  { lat: -15.48, lon: -69.25 },
+  { lat: -16.18, lon: -68.92 },
+  { lat: -16.58, lon: -69.04 },
+  { lat: -17.49, lon: -69.47 },
+  { lat: -17.95, lon: -69.85 },
+  { lat: -18.35, lon: -70.38 },
+  // Franja marítima frente al litoral peruano (sin invadir Chile ni Ecuador)
+  { lat: -18.35, lon: -72.25 },
+  { lat: -17.20, lon: -73.95 },
+  { lat: -15.40, lon: -76.95 },
+  { lat: -13.80, lon: -78.10 },
+  { lat: -12.05, lon: -79.00 },
+  { lat: -9.10, lon: -80.40 },
+  { lat: -6.90, lon: -81.75 },
+  { lat: -5.00, lon: -83.00 },
+  { lat: -3.45, lon: -82.25 },
+];
 
 /** Límites aproximados del mundo. */
 export const WORLD_BOUNDS: Bounds = {
@@ -67,12 +209,33 @@ export function isWithinBounds(bounds: Bounds | null | undefined, lat: number, l
   );
 }
 
+/** Ray-casting para comprobar si un punto (lat, lon) está dentro de un polígono. */
+export function isPointInPolygon(
+  polygon: readonly LatLng[] | null | undefined,
+  lat: number,
+  lon: number,
+): boolean {
+  if (!polygon || polygon.length < 3) return true;
+  let inside = false;
+  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+    const xi = polygon[i].lon;
+    const yi = polygon[i].lat;
+    const xj = polygon[j].lon;
+    const yj = polygon[j].lat;
+    const intersects =
+      yi > lat !== yj > lat && lon < ((xj - xi) * (lat - yi)) / (yj - yi || 1e-12) + xi;
+    if (intersects) inside = !inside;
+  }
+  return inside;
+}
+
 export function matchesFilter(event: EarthquakeEvent, filter: EventFilter = {}): boolean {
   if (filter.minMagnitude != null && event.magnitude < filter.minMagnitude) return false;
   if (filter.maxMagnitude != null && event.magnitude > filter.maxMagnitude) return false;
   if (filter.since != null && event.timestamp < filter.since) return false;
   if (filter.until != null && event.timestamp > filter.until) return false;
   if (filter.bounds && !isWithinBounds(filter.bounds, event.lat, event.lon)) return false;
+  if (filter.polygon && !isPointInPolygon(filter.polygon, event.lat, event.lon)) return false;
   if (filter.sources?.length && !filter.sources.includes(event.source)) return false;
   if (filter.search) {
     const needle = filter.search.trim().toLowerCase();

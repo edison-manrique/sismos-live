@@ -77,6 +77,24 @@
   pointer-events: none;
 }
 
+.selectionSvg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.selectionPath {
+  fill: rgba(255, 122, 61, 0.045);
+  stroke: rgba(255, 122, 61, 0.72);
+  stroke-width: 1.75;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+  vector-effect: non-scaling-stroke;
+}
+
 .markerWrap {
   position: absolute;
   left: 0;
@@ -160,12 +178,13 @@
 }
 
 .markerLabel {
-  font-size: calc(var(--marker-size, 12px) * 0.42);
-  font-weight: 800;
+  font-family: var(--font-display, inherit);
+  font-size: max(9px, calc(var(--marker-size, 12px) * 0.43));
+  font-weight: 700;
   line-height: 1;
-  letter-spacing: -0.02em;
+  letter-spacing: 0.01em;
   color: #fff;
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.85);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9);
   pointer-events: none;
 }
 

@@ -1,4 +1,4 @@
-import { createMemo, Show } from 'solid-js';
+import { Show } from 'solid-js';
 import { formatClock, formatMagnitude, formatNumber, magnitudeColor } from '@sismos/seismic';
 import { useApp } from '../state';
 import {
@@ -11,32 +11,8 @@ import {
 } from './Icons';
 import styles from './Header.module.css';
 
-type Tone = 'live' | 'warn' | 'error' | 'idle';
-
 export default function Header() {
   const app = useApp();
-
-  const status = createMemo<{ label: string; tone: Tone; hint: string }>(() => {
-    const snapshot = app.snapshot();
-    switch (snapshot.connection) {
-      case 'open':
-        return { label: 'En vivo', tone: 'live', hint: 'WebSocket EMSC conectado' };
-      case 'connecting':
-        return { label: 'Conectando', tone: 'warn', hint: 'Abriendo WebSocket EMSC…' };
-      case 'reconnecting':
-        return {
-          label: 'Reconectando',
-          tone: 'warn',
-          hint: `Intento ${snapshot.reconnectAttempt} · backoff exponencial`,
-        };
-      case 'error':
-        return { label: 'Error', tone: 'error', hint: snapshot.error ?? 'Fallo de conexión' };
-      case 'closed':
-        return { label: 'Sin conexión', tone: 'error', hint: 'WebSocket cerrado' };
-      default:
-        return { label: 'Iniciando', tone: 'idle', hint: 'Preparando el monitor' };
-    }
-  });
 
   const maxMagnitude = () => (app.stats().total ? formatMagnitude(app.stats().maxMagnitude) : '—');
 
@@ -102,7 +78,7 @@ export default function Header() {
           type="button"
           class={styles.iconBtn}
           classList={{ [styles.iconActive]: app.ui.sound }}
-          onClick={() => app.setUi('sound', !app.ui.sound)}
+          onClick={() => app.toggleSound()}
           aria-pressed={app.ui.sound}
           title={app.ui.sound ? 'Silenciar alertas sonoras' : 'Activar alertas sonoras'}
           aria-label="Alertas sonoras"
@@ -116,7 +92,7 @@ export default function Header() {
           type="button"
           class={styles.iconBtn}
           classList={{ [styles.iconActive]: app.ui.notifications }}
-          onClick={() => app.setUi('notifications', !app.ui.notifications)}
+          onClick={() => app.toggleNotifications()}
           aria-pressed={app.ui.notifications}
           title={app.ui.notifications ? 'Desactivar avisos' : 'Activar avisos'}
           aria-label="Avisos de nuevos sismos"
@@ -137,13 +113,8 @@ export default function Header() {
         </button>
 
         <div class={styles.clock}>
-          <span class={styles.clockValue}>{formatClock(app.now())}</span>
+          <span class={styles.clockValue}>{formatClock(app.clockNow())}</span>
           <span class={styles.clockLabel}>hora local</span>
-        </div>
-
-        <div class={styles.statusPill} data-tone={status().tone} title={status().hint}>
-          <span class={styles.statusDot} />
-          <span class={styles.statusLabel}>{status().label}</span>
         </div>
       </div>
     </header>

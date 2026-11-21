@@ -51,6 +51,26 @@ export interface EarthquakeEvent {
   tsunami: boolean;
   /** Enlace a la ficha oficial cuando existe. */
   url?: string;
+  /** Estado de revisión (reviewed, automatic, etc.). */
+  status?: string;
+  /** Agencia o red sísmica reportante (IGP, us, ci, EMSC, etc.). */
+  agency?: string;
+  /** Cantidad de reportes "Lo sentí" (DYFI de USGS). */
+  felt?: number | null;
+  /** Intensidad máxima percibida (CDI, escala MMI). */
+  cdi?: number | null;
+  /** Intensidad instrumental estimada (ShakeMap MMI). */
+  mmi?: number | null;
+  /** Índice de relevancia USGS (0-1000+). */
+  significance?: number | null;
+  /** Número de estaciones sísmicas utilizadas. */
+  stations?: number | null;
+  /** Brecha azimutal máxima entre estaciones (grados). */
+  gap?: number | null;
+  /** Residual RMS de tiempo de viaje (segundos). */
+  rms?: number | null;
+  /** Distancia a la estación más cercana (km). */
+  nearestStationKm?: number | null;
 }
 
 /** Filtro aplicable en memoria (también usado por el feed). */
@@ -62,6 +82,7 @@ export interface EventFilter {
   /** Epoch ms máximo. */
   until?: number | null;
   bounds?: Bounds | null;
+  polygon?: LatLng[] | null;
   sources?: EarthquakeSource[] | null;
   /** Búsqueda de texto libre sobre place/region. */
   search?: string;
@@ -133,6 +154,7 @@ export interface EmscMessage {
       mag?: number | null;
       magtype?: string;
       auth?: string;
+      evtype?: string;
       [key: string]: unknown;
     };
   };
@@ -152,6 +174,16 @@ export interface UsgsFeature {
     tsunami?: number;
     magType?: string;
     type?: string;
+    status?: string;
+    net?: string;
+    felt?: number | null;
+    cdi?: number | null;
+    mmi?: number | null;
+    sig?: number | null;
+    nst?: number | null;
+    gap?: number | null;
+    rms?: number | null;
+    dmin?: number | null;
     [key: string]: unknown;
   };
   geometry: {

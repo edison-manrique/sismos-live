@@ -5,6 +5,7 @@ import {
   createSignal,
   onCleanup,
   onMount,
+  untrack,
   useContext,
   type Accessor,
   type JSX,
@@ -13,7 +14,10 @@ import { createStore, type SetStoreFunction } from 'solid-js/store';
 import {
   EarthquakeFeed,
   PERU_BOUNDS,
+  PERU_SEISMIC_POLYGON,
   computeStats,
+  formatDepth,
+  formatMagnitude,
   matchesFilter,
   sortByMagnitudeDesc,
   sortByTimeDesc,
@@ -22,6 +26,7 @@ import {
   type EarthquakeSource,
   type FeedSnapshot,
   type FeedStats,
+  type LatLng,
 } from '@sismos/seismic';
 import type { MapTheme } from '@sismos/geomap';
 
@@ -69,8 +74,12 @@ export interface AppState {
   resetFilters: () => void;
   ui: UiSettings;
   setUi: SetStoreFunction<UiSettings>;
+  toggleSound: () => void;
+  toggleNotifications: () => void;
   bounds: Accessor<Bounds | null>;
+  polygon: Accessor<LatLng[] | null>;
   now: Accessor<number>;
+  clockNow: Accessor<number>;
   isLive: Accessor<boolean>;
   toasts: Accessor<QuakeToast[]>;
   dismissToast: (id: string) => void;
@@ -87,7 +96,8 @@ const DEFAULT_FILTERS: Filters = {
   sort: 'time',
 };
 
-const UI_STORAGE_KEY = 'sismos-live.ui.v1';
+const UI_STORAGE_KEY = 'sismos-live.ui.v2';
+const LEGACY_UI_STORAGE_KEY = 'sismos-live.ui.v1';
 const VALID_THEMES: MapTheme[] = ['voyager', 'light', 'satellite', 'dark'];
 
 const feed = new EarthquakeFeed({
@@ -98,17 +108,31 @@ const feed = new EarthquakeFeed({
 });
 
 function loadUi(): UiSettings {
-  const fallback: UiSettings = { theme: 'voyager', sound: false, notifications: true };
+  const fallback: UiSettings = { theme: 'voyager', sound: true, notifications: true };
   try {
     const raw = localStorage.getItem(UI_STORAGE_KEY);
-    if (!raw) return fallback;
-    const parsed = JSON.parse(raw) as Partial<UiSettings>;
-    return {
-      theme: parsed.theme && VALID_THEMES.includes(parsed.theme) ? parsed.theme : fallback.theme,
-      sound: typeof parsed.sound === 'boolean' ? parsed.sound : fallback.sound,
-      notifications:
-        typeof parsed.notifications === 'boolean' ? parsed.notifications : fallback.notifications,
-    };
+    if (raw) {
+      const parsed = JSON.parse(raw) as Partial<UiSettings>;
+      return {
+        theme: parsed.theme && VALID_THEMES.includes(parsed.theme) ? parsed.theme : fallback.theme,
+        sound: typeof parsed.sound === 'boolean' ? parsed.sound : fallback.sound,
+        notifications:
+          typeof parsed.notifications === 'boolean' ? parsed.notifications : fallback.notifications,
+      };
+    }
+
+    const legacyRaw = localStorage.getItem(LEGACY_UI_STORAGE_KEY);
+    if (legacyRaw) {
+      const legacy = JSON.parse(legacyRaw) as Partial<UiSettings>;
+      return {
+        theme: legacy.theme && VALID_THEMES.includes(legacy.theme) ? legacy.theme : fallback.theme,
+        sound: fallback.sound,
+        notifications:
+          typeof legacy.notifications === 'boolean' ? legacy.notifications : fallback.notifications,
+      };
+    }
+
+    return fallback;
   } catch {
     return fallback;
   }
@@ -116,27 +140,69 @@ function loadUi(): UiSettings {
 
 let audioContext: AudioContext | null = null;
 
-/** Doble tono discreto para alertas sísmicas. */
-function playChime(): void {
+function getAudioContext(): AudioContext | null {
+  if (typeof window === 'undefined') return null;
+  const Ctor =
+    window.AudioContext ??
+    (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+  if (!Ctor) return null;
+  audioContext ??= new Ctor();
+  return audioContext;
+}
+
+function unlockAudio(): void {
   try {
-    audioContext ??= new AudioContext();
-    if (audioContext.state === 'suspended') void audioContext.resume();
-    const start = audioContext.currentTime;
-    [784, 1175].forEach((frequency, index) => {
-      const oscillator = audioContext!.createOscillator();
-      const gain = audioContext!.createGain();
-      const at = start + index * 0.13;
-      oscillator.type = 'sine';
-      oscillator.frequency.value = frequency;
+    const ctx = getAudioContext();
+    if (ctx && ctx.state === 'suspended') {
+      void ctx.resume();
+    }
+  } catch {
+    /* ignore */
+  }
+}
+
+/** Alarma sonora sísmica: doble tono para sismos moderados y triple pulso urgente para M >= 4.5. */
+async function playChime(magnitude = 4.0): Promise<void> {
+  try {
+    const ctx = getAudioContext();
+    if (!ctx) return;
+    if (ctx.state === 'suspended') {
+      await ctx.resume();
+    }
+    if (ctx.state !== 'running') return;
+
+    const start = ctx.currentTime + 0.02;
+    const isStrong = magnitude >= 4.5;
+    const notes = isStrong ? [880, 1175, 880, 1175, 880] : [784, 1175];
+    const step = isStrong ? 0.14 : 0.13;
+
+    notes.forEach((frequency, index) => {
+      const oscillator = ctx.createOscillator();
+      const gain = ctx.createGain();
+      const at = start + index * step;
+      oscillator.type = isStrong ? 'triangle' : 'sine';
+      oscillator.frequency.setValueAtTime(frequency, at);
       gain.gain.setValueAtTime(0.0001, at);
-      gain.gain.exponentialRampToValueAtTime(0.11, at + 0.02);
-      gain.gain.exponentialRampToValueAtTime(0.0001, at + 0.28);
-      oscillator.connect(gain).connect(audioContext!.destination);
+      gain.gain.exponentialRampToValueAtTime(isStrong ? 0.18 : 0.12, at + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, at + 0.24);
+      oscillator.connect(gain).connect(ctx.destination);
       oscillator.start(at);
-      oscillator.stop(at + 0.32);
+      oscillator.stop(at + 0.26);
     });
   } catch {
     /* El navegador puede bloquear el audio sin interacción previa. */
+  }
+}
+
+function showBrowserNotification(event: EarthquakeEvent): void {
+  try {
+    if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
+    new Notification(`Sismo M${formatMagnitude(event.magnitude)} · ${event.place}`, {
+      body: `Profundidad ${formatDepth(event.depth)} · Fuente ${event.source}`,
+      tag: event.id,
+    });
+  } catch {
+    /* Entorno sin soporte de notificaciones */
   }
 }
 
@@ -147,13 +213,19 @@ function createAppState(): AppState {
   const [selectedId, setSelectedId] = createSignal<string | null>(null);
   const [toasts, setToasts] = createSignal<QuakeToast[]>([]);
   const [now, setNow] = createSignal(Date.now());
+  const [clockNow, setClockNow] = createSignal(Date.now());
 
   const toastTimers = new Map<string, number>();
   const knownIds = new Set<string>();
+  const recentAlerted: Array<{ timestamp: number; lat: number; lon: number }> = [];
   let baselineReady = false;
 
   const bounds = createMemo<Bounds | null>(() =>
     filters.region === 'peru' ? PERU_BOUNDS : null,
+  );
+
+  const polygon = createMemo<LatLng[] | null>(() =>
+    filters.region === 'peru' ? PERU_SEISMIC_POLYGON : null,
   );
 
   const windowStart = createMemo<number | null>(() => {
@@ -166,7 +238,7 @@ function createAppState(): AppState {
       matchesFilter(event, {
         minMagnitude: filters.minMagnitude,
         since: windowStart(),
-        bounds: bounds(),
+        polygon: polygon(),
         sources: filters.source === 'all' ? null : [filters.source],
         search: filters.search,
       }),
@@ -193,22 +265,44 @@ function createAppState(): AppState {
     setToasts((current) => current.filter((toast) => toast.id !== id));
   };
 
+  const isDuplicateAlert = (event: EarthquakeEvent): boolean => {
+    const cutoff = Date.now() - 10 * 60_000;
+    while (recentAlerted.length > 0 && recentAlerted[0].timestamp < cutoff) {
+      recentAlerted.shift();
+    }
+    const matched = recentAlerted.some(
+      (prev) =>
+        Math.abs(prev.timestamp - event.timestamp) < 120_000 &&
+        Math.abs(prev.lat - event.lat) < 0.8 &&
+        Math.abs(prev.lon - event.lon) < 0.8,
+    );
+    if (!matched) {
+      recentAlerted.push({ timestamp: event.timestamp, lat: event.lat, lon: event.lon });
+    }
+    return matched;
+  };
+
   const pushToast = (event: EarthquakeEvent): void => {
+    if (ui.sound) {
+      void playChime(event.magnitude);
+    }
     if (!ui.notifications) return;
+
     const id = `${event.id}:${Date.now()}`;
     setToasts((current) => [{ id, event, createdAt: Date.now() }, ...current].slice(0, 3));
     toastTimers.set(
       id,
       window.setTimeout(() => dismissToast(id), 14_000),
     );
-    if (ui.sound && event.magnitude >= 5) playChime();
+    showBrowserNotification(event);
   };
 
-  // Detecta eventos nuevos después de la carga inicial para lanzar avisos.
+  // Detecta eventos nuevos después de completar la sincronización inicial para lanzar alarmas.
   createEffect(() => {
     const snap = snapshot();
     if (!baselineReady) {
-      if (snap.lastSyncAt != null || snap.total > 0) {
+      const initialSettled = snap.lastSyncAt != null || (!snap.loading && snap.error != null);
+      if (initialSettled) {
         baselineReady = true;
         for (const event of snap.events) knownIds.add(event.id);
       }
@@ -226,10 +320,24 @@ function createAppState(): AppState {
       for (const event of snap.events) knownIds.add(event.id);
     }
 
+    const activePolygon = untrack(() => polygon());
+    const activeMinMag = untrack(() => filters.minMagnitude);
+    const activeSources = untrack(() =>
+      filters.source === 'all' ? null : [filters.source],
+    );
+
     for (const event of fresh) {
-      if (event.magnitude < 4.5) continue;
-      if (Date.now() - event.timestamp > 15 * 60_000) continue;
-      if (!matchesFilter(event, { bounds: bounds(), minMagnitude: 4.5 })) continue;
+      if (Date.now() - event.timestamp > 60 * 60_000) continue;
+      if (
+        !matchesFilter(event, {
+          polygon: activePolygon,
+          minMagnitude: activeMinMag,
+          sources: activeSources,
+        })
+      ) {
+        continue;
+      }
+      if (isDuplicateAlert(event)) continue;
       pushToast(event);
     }
   });
@@ -251,14 +359,40 @@ function createAppState(): AppState {
     const unsubscribe = feed.subscribe(setSnapshot);
     feed.start();
     const ticker = window.setInterval(() => setNow(Date.now()), 30_000);
+    const clockTicker = window.setInterval(() => setClockNow(Date.now()), 1_000);
+
+    const onGesture = () => unlockAudio();
+    window.addEventListener('pointerdown', onGesture, { passive: true });
+    window.addEventListener('keydown', onGesture, { passive: true });
+
     onCleanup(() => {
       unsubscribe();
       feed.stop();
       clearInterval(ticker);
+      clearInterval(clockTicker);
+      window.removeEventListener('pointerdown', onGesture);
+      window.removeEventListener('keydown', onGesture);
       for (const timer of toastTimers.values()) clearTimeout(timer);
       toastTimers.clear();
     });
   });
+
+  const toggleSound = (): void => {
+    const next = !ui.sound;
+    setUi('sound', next);
+    if (next) {
+      unlockAudio();
+      void playChime(3.5);
+    }
+  };
+
+  const toggleNotifications = (): void => {
+    const next = !ui.notifications;
+    setUi('notifications', next);
+    if (next && typeof Notification !== 'undefined' && Notification.permission === 'default') {
+      void Notification.requestPermission().catch(() => undefined);
+    }
+  };
 
   return {
     snapshot,
@@ -271,8 +405,12 @@ function createAppState(): AppState {
     resetFilters: () => setFilters({ ...DEFAULT_FILTERS }),
     ui,
     setUi,
+    toggleSound,
+    toggleNotifications,
     bounds,
+    polygon,
     now,
+    clockNow,
     isLive,
     toasts,
     dismissToast,
