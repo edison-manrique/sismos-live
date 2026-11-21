@@ -111,6 +111,9 @@ export class TileMap {
   private selectedId: string | null = null;
   private drag: DragState | null = null;
   private pinch: PinchState | null = null;
+  private hoverPoint: Point | null = null;
+  private wheelSettleTimer: number | null = null;
+  private wheelStartZoom: number | null = null;
   private animationRaf: number | null = null;
   private destroyed = false;
 
@@ -256,7 +259,7 @@ export class TileMap {
       lat: (bounds.minLat + bounds.maxLat) / 2,
       lon: (bounds.minLon + bounds.maxLon) / 2,
     };
-    const zoom = zoomToFit(
+    const rawZoom = zoomToFit(
       bounds,
       this.width,
       this.height,
@@ -265,15 +268,74 @@ export class TileMap {
       this.minZoom,
       this.maxZoom,
     );
+    const zoom = clamp(Math.floor(rawZoom + 0.08), this.minZoom, this.maxZoom);
     this.setView({ center, zoom }, { animate });
   }
 
   zoomIn(): void {
-    this.flyTo(this.center, this.zoom + 1, 300);
+    const anchor = this.isInsideViewport(this.hoverPoint) ? this.hoverPoint : null;
+    const base = Math.round(this.zoom);
+    const target = this.zoom < base - 0.15 ? base : base + 1;
+    this.zoomAround(target, anchor, 240);
   }
 
   zoomOut(): void {
-    this.flyTo(this.center, this.zoom - 1, 300);
+    const anchor = this.isInsideViewport(this.hoverPoint) ? this.hoverPoint : null;
+    const base = Math.round(this.zoom);
+    const target = this.zoom > base + 0.15 ? base : base - 1;
+    this.zoomAround(target, anchor, 240);
+  }
+
+  private isInsideViewport(point: Point | null | undefined): point is Point {
+    return (
+      point != null &&
+      point.x >= 0 &&
+      point.x <= this.width &&
+      point.y >= 0 &&
+      point.y <= this.height
+    );
+  }
+
+  private zoomAround(targetZoom: number, anchorLocal: Point | null = null, duration = 240): void {
+    this.cancelAnimation();
+    const clampedZoom = clamp(targetZoom, this.minZoom, this.maxZoom);
+    if (Math.abs(clampedZoom - this.zoom) < 1e-4) {
+      this.zoom = clampedZoom;
+      this.render();
+      this.emit('zoom-end', this.viewInfo());
+      return;
+    }
+
+    const anchor = this.isInsideViewport(anchorLocal)
+      ? { x: anchorLocal.x, y: anchorLocal.y }
+      : { x: this.width / 2, y: this.height / 2 };
+    const anchorGeo = this.unproject(anchor.x, anchor.y);
+    const fromZoom = this.zoom;
+    const start = performance.now();
+
+    const step = (now: number) => {
+      if (this.destroyed) return;
+      const t = Math.min(1, (now - start) / Math.max(1, duration));
+      const k = 1 - (1 - t) ** 3;
+      this.zoom = fromZoom + (clampedZoom - fromZoom) * k;
+      const { z, scale } = this.scaleInfo();
+      const wx = lonToWorldX(anchorGeo.lon, z, this.tileSize);
+      const wy = latToWorldY(anchorGeo.lat, z, this.tileSize);
+      const centerX = wx - (anchor.x - this.width / 2) / scale;
+      const centerY = wy - (anchor.y - this.height / 2) / scale;
+      this.center = {
+        lat: clampLat(worldYToLat(centerY, z, this.tileSize)),
+        lon: wrapLon(worldXToLon(centerX, z, this.tileSize)),
+      };
+      this.render();
+      if (t < 1) {
+        this.animationRaf = requestAnimationFrame(step);
+      } else {
+        this.animationRaf = null;
+        this.emit('zoom-end', this.viewInfo());
+      }
+    };
+    this.animationRaf = requestAnimationFrame(step);
   }
 
   /** Desplaza el contenido del mapa `dx`/`dy` píxeles. */
@@ -380,7 +442,10 @@ export class TileMap {
       this.tileZoom = z;
     }
     const offset = this.offsetFor(z, scale);
-    this.tileLayer.style.transform = `translate3d(${offset.x}px, ${offset.y}px, 0) scale(${scale})`;
+    this.tileLayer.style.transform =
+      scale === 1
+        ? `translate3d(${offset.x}px, ${offset.y}px, 0)`
+        : `translate3d(${offset.x}px, ${offset.y}px, 0) scale(${scale})`;
     this.syncTiles(z, offset, scale);
     this.positionMarkers(z, offset, scale);
     this.renderSelection();
@@ -389,14 +454,22 @@ export class TileMap {
   }
 
   private scaleInfo(): { z: number; scale: number } {
-    const z = clamp(Math.round(this.zoom), 0, 22);
+    const nearest = Math.round(this.zoom);
+    if (Math.abs(this.zoom - nearest) < 1e-4) {
+      const z = clamp(nearest, 0, Math.min(22, this.maxZoom));
+      return { z, scale: 1 };
+    }
+    // Evita reescalar teselas por encima de ~1.09x eligiendo el nivel superior durante transiciones.
+    const z = clamp(Math.ceil(this.zoom - 0.12), 0, Math.min(22, this.maxZoom));
     return { z, scale: 2 ** (this.zoom - z) };
   }
 
   private offsetFor(z: number, scale: number): Point {
     const centerX = lonToWorldX(this.center.lon, z, this.tileSize);
     const centerY = latToWorldY(this.center.lat, z, this.tileSize);
-    return { x: this.width / 2 - centerX * scale, y: this.height / 2 - centerY * scale };
+    const x = this.width / 2 - centerX * scale;
+    const y = this.height / 2 - centerY * scale;
+    return scale === 1 ? { x: Math.round(x), y: Math.round(y) } : { x, y };
   }
 
   private syncTiles(z: number, offset: Point, scale: number): void {
@@ -630,6 +703,7 @@ export class TileMap {
   private bindEvents(): void {
     this.root.addEventListener('pointerdown', this.onPointerDown);
     this.root.addEventListener('pointermove', this.onPointerMove);
+    this.root.addEventListener('pointerleave', this.onPointerLeave);
     this.root.addEventListener('pointerup', this.onPointerUp);
     this.root.addEventListener('pointercancel', this.onPointerUp);
     this.root.addEventListener('wheel', this.onWheel, { passive: false });
@@ -641,6 +715,7 @@ export class TileMap {
   private unbindEvents(): void {
     this.root.removeEventListener('pointerdown', this.onPointerDown);
     this.root.removeEventListener('pointermove', this.onPointerMove);
+    this.root.removeEventListener('pointerleave', this.onPointerLeave);
     this.root.removeEventListener('pointerup', this.onPointerUp);
     this.root.removeEventListener('pointercancel', this.onPointerUp);
     this.root.removeEventListener('wheel', this.onWheel);
@@ -696,7 +771,14 @@ export class TileMap {
     }
   };
 
+  private onPointerLeave = (): void => {
+    this.hoverPoint = null;
+  };
+
   private onPointerMove = (event: PointerEvent): void => {
+    const hover = this.localPoint(event);
+    this.hoverPoint = this.isInsideViewport(hover) ? hover : null;
+
     if (!this.pointers.has(event.pointerId)) return;
     this.pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
 
@@ -708,7 +790,7 @@ export class TileMap {
 
       const local = this.localPointFromPoint({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
       const anchor = this.project(this.pinch.anchor.lat, this.pinch.anchor.lon);
-      this.panByPixels(anchor.x - local.x, anchor.y - local.y);
+      this.panByPixels(local.x - anchor.x, local.y - anchor.y);
       return;
     }
 
@@ -746,7 +828,12 @@ export class TileMap {
         this.emit('click', { lat: coords.lat, lon: coords.lon, screen: local });
       }
     }
-    if (this.pointers.size < 2) this.pinch = null;
+    if (this.pointers.size < 2) {
+      if (this.pinch) {
+        this.pinch = null;
+        this.zoomAround(Math.round(this.zoom), this.hoverPoint, 160);
+      }
+    }
   };
 
   private onWheel = (event: WheelEvent): void => {
@@ -755,27 +842,47 @@ export class TileMap {
     this.cancelAnimation();
 
     const local = this.localPoint(event);
-    const before = this.unproject(local.x, local.y);
-    const delta = event.deltaMode === 1 ? event.deltaY * 16 : event.deltaY;
-    const nextZoom = clamp(this.zoom - delta * 0.0022, this.minZoom, this.maxZoom);
-    if (nextZoom === this.zoom) return;
+    const inside = this.isInsideViewport(local);
+    this.hoverPoint = inside ? local : null;
+    const anchor = inside ? local : { x: this.width / 2, y: this.height / 2 };
 
-    this.zoom = nextZoom;
-    const after = this.project(before.lat, before.lon);
-    this.panByPixels(after.x - local.x, after.y - local.y);
+    const before = this.unproject(anchor.x, anchor.y);
+    const delta = event.deltaMode === 1 ? event.deltaY * 16 : event.deltaY;
+    if (this.wheelStartZoom == null) {
+      this.wheelStartZoom = this.zoom;
+    }
+
+    const nextZoom = clamp(this.zoom - delta * 0.0022, this.minZoom, this.maxZoom);
+    if (nextZoom !== this.zoom) {
+      this.zoom = nextZoom;
+      const after = this.project(before.lat, before.lon);
+      this.panByPixels(anchor.x - after.x, anchor.y - after.y);
+    }
+
+    if (this.wheelSettleTimer != null) {
+      window.clearTimeout(this.wheelSettleTimer);
+    }
+    this.wheelSettleTimer = window.setTimeout(() => {
+      this.wheelSettleTimer = null;
+      const startZ = this.wheelStartZoom ?? this.zoom;
+      this.wheelStartZoom = null;
+      const diff = this.zoom - startZ;
+      const target =
+        Math.abs(diff) > 0.06 && Math.abs(diff) < 0.5
+          ? clamp(Math.round(startZ) + Math.sign(diff), this.minZoom, this.maxZoom)
+          : clamp(Math.round(this.zoom), this.minZoom, this.maxZoom);
+      this.zoomAround(target, inside ? anchor : null, 160);
+    }, 150);
   };
 
   private onDoubleClick = (event: MouseEvent): void => {
     if (!this.interactive) return;
     event.preventDefault();
     const local = this.localPoint(event);
-    const before = this.unproject(local.x, local.y);
-    const nextZoom = clamp(this.zoom + 1, this.minZoom, this.maxZoom);
-    if (nextZoom === this.zoom) return;
-    this.zoom = nextZoom;
-    const after = this.project(before.lat, before.lon);
-    this.panByPixels(after.x - local.x, after.y - local.y);
-    this.emit('zoom-end', this.viewInfo());
+    const anchor = this.isInsideViewport(local) ? local : null;
+    const base = Math.round(this.zoom);
+    const target = this.zoom < base - 0.15 ? base : base + 1;
+    this.zoomAround(target, anchor, 240);
   };
 
   private onKeyDown = (event: KeyboardEvent): void => {
@@ -839,6 +946,10 @@ export class TileMap {
     if (this.animationRaf != null) {
       cancelAnimationFrame(this.animationRaf);
       this.animationRaf = null;
+    }
+    if (this.wheelSettleTimer != null) {
+      window.clearTimeout(this.wheelSettleTimer);
+      this.wheelSettleTimer = null;
     }
   }
 

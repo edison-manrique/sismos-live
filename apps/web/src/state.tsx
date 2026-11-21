@@ -164,8 +164,113 @@ function unlockAudio(): void {
   }
 }
 
-/** Alarma sonora sísmica: doble tono para sismos moderados y triple pulso urgente para M >= 4.5. */
+let stopCurrentAlarm: (() => void) | null = null;
+
+function stopActiveAlarm(): void {
+  if (stopCurrentAlarm) {
+    stopCurrentAlarm();
+    stopCurrentAlarm = null;
+  }
+}
+
+/** Alarma sonora tipo sirena de emergencia (12 segundos) para sismos M >= 6.0. */
+async function playSiren12s(): Promise<void> {
+  try {
+    const ctx = getAudioContext();
+    if (!ctx) return;
+    if (ctx.state === 'suspended') {
+      await ctx.resume();
+    }
+    if (ctx.state !== 'running') return;
+
+    stopActiveAlarm();
+
+    const duration = 12;
+    const start = ctx.currentTime + 0.03;
+    const end = start + duration;
+
+    const filter = ctx.createBiquadFilter();
+    filter.type = 'lowpass';
+    filter.frequency.setValueAtTime(1950, start);
+    filter.Q.setValueAtTime(1.2, start);
+
+    const masterGain = ctx.createGain();
+    masterGain.gain.setValueAtTime(0.0001, start);
+    masterGain.gain.exponentialRampToValueAtTime(0.22, start + 0.15);
+    masterGain.gain.setValueAtTime(0.22, end - 0.35);
+    masterGain.gain.exponentialRampToValueAtTime(0.0001, end);
+
+    const oscPrimary = ctx.createOscillator();
+    oscPrimary.type = 'sawtooth';
+
+    const oscHarmonic = ctx.createOscillator();
+    oscHarmonic.type = 'triangle';
+
+    // 8 ciclos de 1.5s (12 segundos totales): subida y bajada continua tipo sirena de alerta sísmica.
+    const cycles = 8;
+    const cycleSec = duration / cycles;
+    oscPrimary.frequency.setValueAtTime(540, start);
+    oscHarmonic.frequency.setValueAtTime(540 * 1.5, start);
+
+    for (let i = 0; i < cycles; i += 1) {
+      const t0 = start + i * cycleSec;
+      const tPeak = t0 + cycleSec * 0.55;
+      const tEnd = t0 + cycleSec;
+      oscPrimary.frequency.linearRampToValueAtTime(1180, tPeak);
+      oscPrimary.frequency.linearRampToValueAtTime(540, tEnd);
+      oscHarmonic.frequency.linearRampToValueAtTime(1180 * 1.5, tPeak);
+      oscHarmonic.frequency.linearRampToValueAtTime(540 * 1.5, tEnd);
+    }
+
+    oscPrimary.connect(filter);
+    oscHarmonic.connect(filter);
+    filter.connect(masterGain);
+    masterGain.connect(ctx.destination);
+
+    let stopped = false;
+    const cleanup = () => {
+      if (stopped) return;
+      stopped = true;
+      try {
+        const now = ctx.currentTime;
+        masterGain.gain.cancelScheduledValues(now);
+        masterGain.gain.setTargetAtTime(0.0001, now, 0.04);
+        oscPrimary.stop(now + 0.12);
+        oscHarmonic.stop(now + 0.12);
+      } catch {
+        /* nodo ya detenido */
+      }
+    };
+
+    stopCurrentAlarm = cleanup;
+    oscPrimary.onended = () => {
+      if (stopCurrentAlarm === cleanup) stopCurrentAlarm = null;
+      try {
+        oscPrimary.disconnect();
+        oscHarmonic.disconnect();
+        filter.disconnect();
+        masterGain.disconnect();
+      } catch {
+        /* ignore */
+      }
+    };
+
+    oscPrimary.start(start);
+    oscHarmonic.start(start);
+    oscPrimary.stop(end + 0.02);
+    oscHarmonic.stop(end + 0.02);
+  } catch {
+    /* El navegador puede bloquear el audio sin interacción previa. */
+  }
+}
+
+/** Alarma sonora sísmica: doble tono, pulso urgente (M >= 4.5) y sirena 12s (M >= 6.0). */
 async function playChime(magnitude = 4.0): Promise<void> {
+  if (magnitude >= 6.0) {
+    await playSiren12s();
+    return;
+  }
+
   try {
     const ctx = getAudioContext();
     if (!ctx) return;
@@ -303,7 +408,7 @@ function createAppState(): AppState {
     setToasts((current) => [{ id, event, createdAt: Date.now() }, ...current].slice(0, 3));
     toastTimers.set(
       id,
-      window.setTimeout(() => dismissToast(id), 14_000),
+      window.setTimeout(() => dismissToast(id), event.magnitude >= 6 ? 18_000 : 14_000),
     );
     showBrowserNotification(event);
   };
@@ -386,6 +491,7 @@ function createAppState(): AppState {
       .catch(() => undefined);
 
     onCleanup(() => {
+      stopActiveAlarm();
       borderController.abort();
       unsubscribe();
       feed.stop();
@@ -404,6 +510,8 @@ function createAppState(): AppState {
     if (next) {
       unlockAudio();
       void playChime(3.5);
+    } else {
+      stopActiveAlarm();
     }
   };
 

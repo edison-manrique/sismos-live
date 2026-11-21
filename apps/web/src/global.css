@@ -35,6 +35,8 @@ body,
   width: 100%;
   height: 100%;
   margin: 0;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 html {
@@ -58,6 +60,13 @@ select,
 textarea {
   font: inherit;
   color: inherit;
+}
+
+input,
+textarea,
+[contenteditable='true'] {
+  user-select: text;
+  -webkit-user-select: text;
 }
 
 button {
