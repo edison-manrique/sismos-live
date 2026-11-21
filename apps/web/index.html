@@ -4,15 +4,113 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="theme-color" content="#05080f" />
-    <meta
-      name="description"
-      content="Monitor sísmico en tiempo real: eventos EMSC vía WebSocket y USGS vía REST sobre un mapa interactivo."
-    />
-    <link
-      rel="icon"
-      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%2305080f'/%3E%3Ccircle cx='32' cy='32' r='7' fill='%23ff7a3d'/%3E%3Ccircle cx='32' cy='32' r='14' fill='none' stroke='%23ff7a3d' stroke-opacity='.55' stroke-width='2'/%3E%3Ccircle cx='32' cy='32' r='22' fill='none' stroke='%23ff7a3d' stroke-opacity='.22' stroke-width='2'/%3E%3C/svg%3E"
-    />
-    <title>Sismos Live · Monitoreo sísmico en tiempo real</title>
+    <meta name="color-scheme" content="dark light" />
+
+    <!-- SEO básico -->
+    <title>Sismos Live — Monitoreo sísmico en tiempo real (EMSC + USGS)</title>
+    <meta name="title" content="Sismos Live — Monitoreo sísmico en tiempo real (EMSC + USGS)" />
+    <meta name="description" content="Monitor sísmico en vivo para Perú y el mundo. Combina EMSC (WebSocket) y USGS (REST) en un mapa interactivo propio sin Leaflet. Filtros por magnitud, región y tiempo. Alertas sonoras, tema oscuro/claro/satélite, PWA-ready." />
+    <meta name="keywords" content="sismos, terremotos, monitoreo sísmico, EMSC, USGS, tiempo real, mapa interactivo, Perú, alertas sísmicas, WebSocket, GeoJSON" />
+    <meta name="author" content="Edison Manrique" />
+    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
+    <link rel="canonical" href="https://edison-manrique.github.io/sismos-live/" />
+
+    <!-- Open Graph (Facebook, LinkedIn, WhatsApp, etc.) -->
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://edison-manrique.github.io/sismos-live/" />
+    <meta property="og:title" content="Sismos Live — Monitoreo sísmico en tiempo real" />
+    <meta property="og:description" content="Visualiza terremotos en vivo combinando EMSC (WebSocket) y USGS (REST). Mapa interactivo propio, filtros avanzados, alertas sonoras y temas oscuro/claro/satélite." />
+    <meta property="og:image" content="https://edison-manrique.github.io/sismos-live/og.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="Captura de Sismos Live: mapa con marcadores sísmicos, panel lateral con filtros y lista de eventos" />
+    <meta property="og:site_name" content="Sismos Live" />
+    <meta property="og:locale" content="es_ES" />
+    <meta property="og:locale:alternate" content="en_US" />
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:url" content="https://edison-manrique.github.io/sismos-live/" />
+    <meta name="twitter:title" content="Sismos Live — Monitoreo sísmico en tiempo real" />
+    <meta name="twitter:description" content="Terremotos en vivo: EMSC WebSocket + USGS REST. Mapa interactivo, filtros, alertas, temas." />
+    <meta name="twitter:image" content="https://edison-manrique.github.io/sismos-live/og.png" />
+    <meta name="twitter:image:alt" content="Mapa sísmico interactivo con marcadores de magnitud y panel de filtros" />
+
+    <!-- Favicon & iconos -->
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%2305080f'/%3E%3Ccircle cx='32' cy='32' r='7' fill='%23ff7a3d'/%3E%3Ccircle cx='32' cy='32' r='14' fill='none' stroke='%23ff7a3d' stroke-opacity='.55' stroke-width='2'/%3E%3Ccircle cx='32' cy='32' r='22' fill='none' stroke='%23ff7a3d' stroke-opacity='.22' stroke-width='2'/%3E%3C/svg%3E" />
+    <link rel="icon" type="image/png" sizes="32x32" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%2305080f'/%3E%3Ccircle cx='32' cy='32' r='7' fill='%23ff7a3d'/%3E%3Ccircle cx='32' cy='32' r='14' fill='none' stroke='%23ff7a3d' stroke-opacity='.55' stroke-width='2'/%3E%3Ccircle cx='32' cy='32' r='22' fill='none' stroke='%23ff7a3d' stroke-opacity='.22' stroke-width='2'/%3E%3C/svg%3E" />
+    <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%2305080f'/%3E%3Ccircle cx='32' cy='32' r='7' fill='%23ff7a3d'/%3E%3Ccircle cx='32' cy='32' r='14' fill='none' stroke='%23ff7a3d' stroke-opacity='.55' stroke-width='2'/%3E%3Ccircle cx='32' cy='32' r='22' fill='none' stroke='%23ff7a3d' stroke-opacity='.22' stroke-width='2'/%3E%3C/svg%3E" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+
+    <!-- PWA / Instalación -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Sismos Live" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="application-name" content="Sismos Live" />
+
+    <!-- Preconnect a orígenes críticos (mejora rendimiento) -->
+    <link rel="preconnect" href="https://tile.openstreetmap.org" crossorigin />
+    <link rel="preconnect" href="https://tile.opentopomap.org" crossorigin />
+    <link rel="preconnect" href="https://tile.openstreetmap.de" crossorigin />
+    <link rel="preconnect" href="https://server.arcgisonline.com" crossorigin />
+    <link rel="preconnect" href="https://earthquake.usgs.gov" crossorigin />
+    <link rel="preconnect" href="https://www.seismicportal.eu" crossorigin />
+
+    <!-- DNS prefetch para recursos secundarios -->
+    <link rel="dns-prefetch" href="https://a.tile.openstreetmap.org" />
+    <link rel="dns-prefetch" href="https://b.tile.openstreetmap.org" />
+    <link rel="dns-prefetch" href="https://c.tile.openstreetmap.org" />
+    <link rel="dns-prefetch" href="https://a.tile.opentopomap.org" />
+    <link rel="dns-prefetch" href="https://b.tile.opentopomap.org" />
+    <link rel="dns-prefetch" href="https://c.tile.opentopomap.org" />
+
+    <!-- Datos estructurados (Schema.org) -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebApplication",
+      "name": "Sismos Live",
+      "alternateName": "Monitor Sísmico en Tiempo Real",
+      "url": "https://edison-manrique.github.io/sismos-live/",
+      "description": "Monitor sísmico en vivo que combina EMSC (WebSocket) y USGS (REST) en un mapa interactivo. Filtros por magnitud, región y ventana temporal. Alertas sonoras y notificaciones.",
+      "applicationCategory": "UtilityApplication",
+      "operatingSystem": "Web",
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "USD",
+        "availability": "https://schema.org/InStock"
+      },
+      "author": {
+        "@type": "Person",
+        "name": "Edison Manrique"
+      },
+      "featureList": [
+        "EMSC WebSocket en tiempo real (ping 15s, reconexión exponencial)",
+        "USGS REST API (GeoJSON, CORS, polling de respaldo)",
+        "Mapa interactivo propio (Web Mercator, zoom fraccional, pan/pinch/teclado)",
+        "4 temas de teselas: Estándar, Claro, Satélite, Topográfico",
+        "Marcadores con magnitud, pulso animado (M≥4.5), click/hover",
+        "Filtros: magnitud (slider), tiempo (1h/24h/7d/Todo), región (Perú/Mundo), fuente (EMSC/USGS), búsqueda textual",
+        "Lista paginada (80 items), orden por tiempo o magnitud",
+        "Alertas sonoras WebAudio (M≥4.5), toasts persistentes",
+        "Persistencia de preferencias (tema, sonido, notificaciones)",
+        "Responsive: sidebar colapsable en móvil (<820px)",
+        "Accesible: ARIA, navegación por teclado, contraste AA"
+      ],
+      "screenshot": "https://edison-manrique.github.io/sismos-live/og.png",
+      "license": "https://opensource.org/licenses/MIT",
+      "datePublished": "2024-11-20",
+      "dateModified": "2024-11-21",
+      "inLanguage": "es-ES"
+    }
+    </script>
+
+    <!-- Hreflang para internacionalización futura -->
+    <link rel="alternate" hreflang="es" href="https://edison-manrique.github.io/sismos-live/" />
+    <link rel="alternate" hreflang="en" href="https://edison-manrique.github.io/sismos-live/" />
+    <link rel="alternate" hreflang="x-default" href="https://edison-manrique.github.io/sismos-live/" />
   </head>
   <body>
     <div id="root"></div>
