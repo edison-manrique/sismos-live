@@ -107,7 +107,7 @@ export class TileMap {
   private height = 1;
   private tileZoom = -1;
   private selectionBounds: Bounds | null = null;
-  private selectionPolygon: LatLng[] | null = null;
+  private selectionPolygon: LatLng[][] | null = null;
   private selectedId: string | null = null;
   private drag: DragState | null = null;
   private pinch: PinchState | null = null;
@@ -126,7 +126,7 @@ export class TileMap {
     this.retina =
       options.retina ?? (typeof window !== 'undefined' && window.devicePixelRatio > 1);
     this.selectionBounds = options.selectionBounds ?? null;
-    this.selectionPolygon = options.selectionPolygon ?? null;
+    this.selectionPolygon = this.normalizePolygons(options.selectionPolygon);
 
     this.root = div(styles.map);
     this.root.tabIndex = 0;
@@ -316,9 +316,19 @@ export class TileMap {
     this.renderSelection();
   }
 
-  setSelectionPolygon(polygon: LatLng[] | null): void {
-    this.selectionPolygon = polygon;
+  setSelectionPolygon(polygon: LatLng[] | LatLng[][] | null): void {
+    this.selectionPolygon = this.normalizePolygons(polygon);
     this.renderSelection();
+  }
+
+  private normalizePolygons(polygon?: LatLng[] | LatLng[][] | null): LatLng[][] | null {
+    if (!polygon || polygon.length === 0) return null;
+    if (Array.isArray(polygon[0])) {
+      const rings = (polygon as LatLng[][]).filter((ring) => ring.length >= 3);
+      return rings.length ? rings : null;
+    }
+    const single = polygon as LatLng[];
+    return single.length >= 3 ? [single] : null;
   }
 
   setInteractive(interactive: boolean): void {
@@ -461,20 +471,27 @@ export class TileMap {
 
   private renderSelection(): void {
     this.selectionLayer.replaceChildren();
-    if (this.selectionPolygon && this.selectionPolygon.length >= 3) {
+    if (this.selectionPolygon && this.selectionPolygon.length > 0) {
       const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
       svg.setAttribute('class', styles.selectionSvg);
       svg.setAttribute('viewBox', `0 0 ${this.width} ${this.height}`);
       svg.setAttribute('width', String(this.width));
       svg.setAttribute('height', String(this.height));
 
-      const coords = this.selectionPolygon.map((point) => {
-        const projected = this.project(point.lat, point.lon);
-        return `${projected.x.toFixed(1)},${projected.y.toFixed(1)}`;
-      });
+      const segments: string[] = [];
+      for (const ring of this.selectionPolygon) {
+        if (ring.length < 3) continue;
+        const coords = ring.map((point) => {
+          const projected = this.project(point.lat, point.lon);
+          return `${projected.x.toFixed(1)},${projected.y.toFixed(1)}`;
+        });
+        segments.push(`M${coords.join('L')}Z`);
+      }
+      if (!segments.length) return;
+
       const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
       path.setAttribute('class', styles.selectionPath);
-      path.setAttribute('d', `M${coords.join('L')}Z`);
+      path.setAttribute('d', segments.join(''));
       svg.appendChild(path);
       this.selectionLayer.appendChild(svg);
       return;

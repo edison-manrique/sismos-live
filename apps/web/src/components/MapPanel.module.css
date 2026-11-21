@@ -353,6 +353,9 @@
   position: absolute;
   z-index: 12;
   width: 344px;
+  max-width: calc(100% - 24px);
+  max-height: calc(100% - 24px);
+  overflow-y: auto;
   padding: 13px;
   border: 1px solid rgba(148, 177, 214, 0.22);
   border-radius: 14px;
@@ -360,34 +363,8 @@
   box-shadow:
     0 24px 60px rgba(0, 0, 0, 0.55),
     inset 0 1px 0 rgba(255, 255, 255, 0.06);
-  transform: translate(-50%, calc(-100% - 18px));
   animation: fadeIn 0.16s ease-out;
   backdrop-filter: blur(16px);
-}
-
-.popup::after {
-  content: '';
-  position: absolute;
-  left: 50%;
-  bottom: -6px;
-  width: 11px;
-  height: 11px;
-  border-right: 1px solid rgba(148, 177, 214, 0.22);
-  border-bottom: 1px solid rgba(148, 177, 214, 0.22);
-  background: #0a1220;
-  transform: translateX(-50%) rotate(45deg);
-}
-
-.popupBelow {
-  transform: translate(-50%, 18px);
-}
-
-.popupBelow::after {
-  top: -6px;
-  bottom: auto;
-  border: 0;
-  border-left: 1px solid rgba(148, 177, 214, 0.22);
-  border-top: 1px solid rgba(148, 177, 214, 0.22);
 }
 
 @keyframes fadeIn {

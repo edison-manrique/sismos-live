@@ -1,7 +1,6 @@
 import { For, Show, createEffect, createMemo, createSignal, on, onCleanup, onMount } from 'solid-js';
 import {
   PERU_BOUNDS,
-  PERU_POLYGON,
   WORLD_BOUNDS,
   formatCoords,
   formatDateTime,
@@ -43,6 +42,28 @@ export default function MapPanel() {
   const [map, setMap] = createSignal<TileMap | null>(null);
   const [view, setView] = createSignal<ViewInfo | null>(null);
   const [themesOpen, setThemesOpen] = createSignal(false);
+  const [popupEl, setPopupEl] = createSignal<HTMLElement | null>(null);
+  const [popupSize, setPopupSize] = createSignal({ width: 344, height: 340 });
+
+  createEffect(() => {
+    const el = popupEl();
+    app.selected();
+    if (!el) return;
+    const measure = () => {
+      setPopupSize({
+        width: el.offsetWidth || 344,
+        height: el.offsetHeight || 340,
+      });
+    };
+    measure();
+    const raf = requestAnimationFrame(measure);
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    onCleanup(() => {
+      cancelAnimationFrame(raf);
+      observer.disconnect();
+    });
+  });
 
   const markers = createMemo<MapMarker[]>(() =>
     app.events().map((event) => ({
@@ -67,14 +88,20 @@ export default function MapPanel() {
     const instance = map();
     if (!event || !info || !instance) return null;
     const point = instance.project(event.lat, event.lon);
-    const width = 344;
-    const half = width / 2 + 14;
-    return {
-      event,
-      x: clamp(point.x, half, Math.max(half, info.width - half)),
-      y: clamp(point.y, 12, Math.max(12, info.height - 12)),
-      below: point.y < 360,
-    };
+    const { width: measuredW, height: measuredH } = popupSize();
+    const margin = 12;
+    const gap = 18;
+    const cardW = Math.min(measuredW, Math.max(220, info.width - margin * 2));
+    const cardH = Math.min(measuredH, Math.max(160, info.height - margin * 2));
+
+    const x = clamp(point.x - cardW / 2, margin, Math.max(margin, info.width - cardW - margin));
+    const fitsAbove = point.y - gap - cardH >= margin;
+    const fitsBelow = point.y + gap + cardH <= info.height - margin;
+    const below = fitsAbove ? false : fitsBelow ? true : info.height - point.y > point.y;
+    const rawY = below ? point.y + gap : point.y - gap - cardH;
+    const y = clamp(rawY, margin, Math.max(margin, info.height - cardH - margin));
+
+    return { event, x, y, below };
   });
 
   const regionBounds = () => (app.filters.region === 'peru' ? PERU_BOUNDS : WORLD_BOUNDS);
@@ -86,7 +113,7 @@ export default function MapPanel() {
       zoom: 5,
       minZoom: 2,
       maxZoom: 17,
-      selectionPolygon: app.filters.region === 'peru' ? PERU_POLYGON : null,
+      selectionPolygon: app.filters.region === 'peru' ? app.peruVisualPolygons() : null,
     });
 
     instance.on('move', (info) => setView(info));
@@ -117,14 +144,21 @@ export default function MapPanel() {
     if (instance) instance.setSelected(app.selectedId());
   });
 
-  // Al cambiar de región, encuadra y ajusta el límite geográfico resaltado.
+  createEffect(() => {
+    const instance = map();
+    if (!instance) return;
+    instance.setSelectionPolygon(
+      app.filters.region === 'peru' ? app.peruVisualPolygons() : null,
+    );
+  });
+
+  // Al cambiar de región, encuadra el mapa.
   createEffect(
     on(
       () => app.filters.region,
       (region) => {
         const instance = map();
         if (!instance) return;
-        instance.setSelectionPolygon(region === 'peru' ? PERU_POLYGON : null);
         instance.fitBounds(region === 'peru' ? PERU_BOUNDS : WORLD_BOUNDS, region === 'peru' ? 48 : 22, true);
       },
       { defer: true },
@@ -346,8 +380,8 @@ export default function MapPanel() {
 
           return (
             <article
+              ref={setPopupEl}
               class={styles.popup}
-              classList={{ [styles.popupBelow]: data().below }}
               style={{ left: `${data().x}px`, top: `${data().y}px` }}
             >
               <button

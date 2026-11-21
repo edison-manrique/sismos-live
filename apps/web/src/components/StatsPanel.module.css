@@ -53,7 +53,7 @@
 .totalValue {
   font-family: var(--font-display);
   font-size: 42px;
-  font-weight: 400;
+  font-weight: 700;
   line-height: 0.95;
   letter-spacing: 0.01em;
   font-variant-numeric: tabular-nums;
@@ -109,7 +109,7 @@
 .strongestValue {
   font-family: var(--font-display);
   font-size: 23px;
-  font-weight: 400;
+  font-weight: 700;
   line-height: 1.1;
   letter-spacing: 0.02em;
   font-variant-numeric: tabular-nums;

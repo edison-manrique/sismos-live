@@ -87,9 +87,9 @@
 }
 
 .selectionPath {
-  fill: rgba(255, 122, 61, 0.045);
-  stroke: rgba(255, 122, 61, 0.72);
-  stroke-width: 1.75;
+  fill: transparent;
+  stroke: rgba(255, 138, 61, 0.56);
+  stroke-width: 1.8;
   stroke-linejoin: round;
   stroke-linecap: round;
   vector-effect: non-scaling-stroke;

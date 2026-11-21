@@ -16,8 +16,10 @@ import {
   PERU_BOUNDS,
   PERU_SEISMIC_POLYGON,
   computeStats,
+  fetchPeruBoundaries,
   formatDepth,
   formatMagnitude,
+  loadCachedPeruBoundaries,
   matchesFilter,
   sortByMagnitudeDesc,
   sortByTimeDesc,
@@ -78,6 +80,7 @@ export interface AppState {
   toggleNotifications: () => void;
   bounds: Accessor<Bounds | null>;
   polygon: Accessor<LatLng[] | null>;
+  peruVisualPolygons: Accessor<LatLng[][] | null>;
   now: Accessor<number>;
   clockNow: Accessor<number>;
   isLive: Accessor<boolean>;
@@ -220,12 +223,20 @@ function createAppState(): AppState {
   const recentAlerted: Array<{ timestamp: number; lat: number; lon: number }> = [];
   let baselineReady = false;
 
+  const cachedPeru = loadCachedPeruBoundaries();
+  const [peruVisualPolygons, setPeruVisualPolygons] = createSignal<LatLng[][] | null>(
+    cachedPeru?.visualRings ?? null,
+  );
+  const [peruSeismicPolygon, setPeruSeismicPolygon] = createSignal<LatLng[]>(
+    cachedPeru?.seismicPolygon ?? PERU_SEISMIC_POLYGON,
+  );
+
   const bounds = createMemo<Bounds | null>(() =>
     filters.region === 'peru' ? PERU_BOUNDS : null,
   );
 
   const polygon = createMemo<LatLng[] | null>(() =>
-    filters.region === 'peru' ? PERU_SEISMIC_POLYGON : null,
+    filters.region === 'peru' ? peruSeismicPolygon() : null,
   );
 
   const windowStart = createMemo<number | null>(() => {
@@ -365,7 +376,17 @@ function createAppState(): AppState {
     window.addEventListener('pointerdown', onGesture, { passive: true });
     window.addEventListener('keydown', onGesture, { passive: true });
 
+    const borderController = new AbortController();
+    void fetchPeruBoundaries({ signal: borderController.signal })
+      .then((boundaries) => {
+        if (borderController.signal.aborted) return;
+        setPeruVisualPolygons(boundaries.visualRings);
+        setPeruSeismicPolygon(boundaries.seismicPolygon);
+      })
+      .catch(() => undefined);
+
     onCleanup(() => {
+      borderController.abort();
       unsubscribe();
       feed.stop();
       clearInterval(ticker);
@@ -409,6 +430,7 @@ function createAppState(): AppState {
     toggleNotifications,
     bounds,
     polygon,
+    peruVisualPolygons,
     now,
     clockNow,
     isLive,

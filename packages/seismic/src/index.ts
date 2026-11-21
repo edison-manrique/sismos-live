@@ -67,3 +67,9 @@ export {
   sortByTimeDesc,
   timeAgo,
 } from './utils.js';
+
+export {
+  fetchPeruBoundaries,
+  loadCachedPeruBoundaries,
+  type PeruBoundaries,
+} from './peruBorder.js';
