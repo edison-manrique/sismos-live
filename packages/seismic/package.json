@@ -1,0 +1,32 @@
+{
+  "name": "@sismos/seismic",
+  "version": "1.0.0",
+  "description": "Librería de datos sísmicos: clientes EMSC (WebSocket) y USGS (REST), normalización, filtros, estadísticas y feed reactivo.",
+  "type": "module",
+  "main": "./src/index.ts",
+  "module": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "import": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "files": [
+    "src",
+    "README.md"
+  ],
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "keywords": [
+    "earthquakes",
+    "emsc",
+    "usgs",
+    "websocket",
+    "seismic",
+    "geojson"
+  ],
+  "license": "MIT"
+}

@@ -1,0 +1,267 @@
+.map {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #0a0f18;
+  touch-action: none;
+  cursor: grab;
+  outline: none;
+  isolation: isolate;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.map[data-theme='voyager'],
+.map[data-theme='light'] {
+  background: #dde6ef;
+}
+
+.map[data-theme='satellite'] {
+  background: #04070b;
+}
+
+.static {
+  cursor: default;
+}
+
+.dragging {
+  cursor: grabbing;
+}
+
+.tiles {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 0;
+  height: 0;
+  transform-origin: 0 0;
+  will-change: transform;
+}
+
+.tile {
+  position: absolute;
+  opacity: 0;
+  transition: opacity 0.4s ease;
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+.loaded {
+  opacity: 1;
+}
+
+.overlays,
+.markers {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.overlays {
+  z-index: 3;
+}
+
+.markers {
+  z-index: 4;
+}
+
+.selection {
+  position: absolute;
+  border: 1.5px dashed rgba(255, 138, 61, 0.6);
+  border-radius: 16px;
+  background: rgba(255, 138, 61, 0.05);
+  box-shadow: inset 0 0 60px rgba(255, 138, 61, 0.08);
+  pointer-events: none;
+}
+
+.markerWrap {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 0;
+  height: 0;
+  will-change: transform;
+}
+
+.marker {
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: grid;
+  place-items: center;
+  width: calc(var(--marker-size, 12px) + 16px);
+  height: calc(var(--marker-size, 12px) + 16px);
+  padding: 0;
+  border: 0;
+  background: none;
+  color: #fff;
+  cursor: pointer;
+  transform: translate(-50%, -50%);
+  pointer-events: auto;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.marker:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 1px;
+  border-radius: 50%;
+}
+
+.dot {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: var(--marker-size, 12px);
+  height: var(--marker-size, 12px);
+  border-radius: 50%;
+  border: 1.5px solid color-mix(in srgb, var(--marker-color, #56c8f5) 88%, #ffffff);
+  background: color-mix(in srgb, var(--marker-color, #56c8f5) 34%, rgba(4, 8, 14, 0.55));
+  box-shadow:
+    0 0 10px color-mix(in srgb, var(--marker-color, #56c8f5) 55%, transparent),
+    0 1px 4px rgba(0, 0, 0, 0.55);
+  transition:
+    transform 0.16s ease,
+    background 0.16s ease;
+}
+
+.marker:hover .dot,
+.marker:focus-visible .dot {
+  transform: scale(1.24);
+  background: color-mix(in srgb, var(--marker-color, #56c8f5) 58%, rgba(4, 8, 14, 0.3));
+}
+
+.selected .dot {
+  transform: scale(1.18);
+  box-shadow:
+    0 0 0 2px #ffffff,
+    0 0 22px color-mix(in srgb, var(--marker-color, #56c8f5) 80%, transparent);
+}
+
+.ring {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: var(--marker-size, 12px);
+  height: var(--marker-size, 12px);
+  margin-left: calc(var(--marker-size, 12px) / -2);
+  margin-top: calc(var(--marker-size, 12px) / -2);
+  border-radius: 50%;
+  border: 1.5px solid var(--marker-color, #56c8f5);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.pulse .ring {
+  animation: ringPulse 2.6s cubic-bezier(0.2, 0.6, 0.3, 1) infinite;
+}
+
+.markerLabel {
+  font-size: calc(var(--marker-size, 12px) * 0.42);
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  color: #fff;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.85);
+  pointer-events: none;
+}
+
+.hasLabel {
+  font-variant-numeric: tabular-nums;
+}
+
+@keyframes ringPulse {
+  0% {
+    transform: scale(0.85);
+    opacity: 0.85;
+  }
+  70% {
+    transform: scale(2.6);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(2.6);
+    opacity: 0;
+  }
+}
+
+.scale {
+  position: absolute;
+  left: 14px;
+  bottom: 12px;
+  z-index: 6;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  pointer-events: none;
+}
+
+.scaleLabel {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: rgba(255, 255, 255, 0.72);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+}
+
+.scaleBar {
+  height: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.75);
+  border-top: 0;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+.map[data-theme='light'] .scaleLabel,
+.map[data-theme='voyager'] .scaleLabel {
+  color: rgba(12, 24, 40, 0.75);
+  text-shadow: 0 1px 2px rgba(255, 255, 255, 0.7);
+}
+
+.map[data-theme='light'] .scaleBar,
+.map[data-theme='voyager'] .scaleBar {
+  border-color: rgba(12, 24, 40, 0.7);
+  box-shadow: 0 1px 2px rgba(255, 255, 255, 0.5);
+}
+
+.attribution {
+  position: absolute;
+  right: 8px;
+  bottom: 5px;
+  z-index: 6;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: rgba(4, 8, 14, 0.5);
+  color: rgba(255, 255, 255, 0.58);
+  font-size: 9.5px;
+  line-height: 1.4;
+  backdrop-filter: blur(6px);
+  pointer-events: auto;
+}
+
+.attribution a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.attribution a:hover {
+  text-decoration: underline;
+}
+
+.map[data-theme='light'] .attribution,
+.map[data-theme='voyager'] .attribution {
+  background: rgba(255, 255, 255, 0.55);
+  color: rgba(12, 24, 40, 0.62);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tile {
+    transition: none;
+  }
+  .pulse .ring {
+    animation: none;
+    opacity: 0.35;
+  }
+}

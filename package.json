@@ -1,0 +1,22 @@
+{
+  "name": "sismos-live",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Monitoreo sísmico en tiempo real (EMSC WebSocket + USGS REST) con SolidJS y un motor de mapas propio.",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "vite --config apps/web/vite.config.ts",
+    "build": "vite build --config apps/web/vite.config.ts",
+    "preview": "vite preview --config apps/web/vite.config.ts",
+    "typecheck": "tsc -p packages/seismic/tsconfig.json && tsc -p packages/geomap/tsconfig.json && tsc -p apps/web/tsconfig.json"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.2"
+  },
+  "engines": {
+    "node": ">=20.19"
+  }
+}
