@@ -327,6 +327,7 @@ const timeFormatter = new Intl.DateTimeFormat('es-PE', {
   hour: '2-digit',
   minute: '2-digit',
   second: '2-digit',
+  hour12: false,
 });
 
 export function formatDateTime(timestamp: number): string {

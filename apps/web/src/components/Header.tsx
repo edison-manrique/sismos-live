@@ -74,33 +74,35 @@ export default function Header() {
 
         <div class={styles.divider} />
 
-        <button
-          type="button"
-          class={styles.iconBtn}
-          classList={{ [styles.iconActive]: app.ui.sound }}
-          onClick={() => app.toggleSound()}
-          aria-pressed={app.ui.sound}
-          title={app.ui.sound ? 'Silenciar alertas sonoras' : 'Activar alertas sonoras'}
-          aria-label="Alertas sonoras"
-        >
-          <Show when={app.ui.sound} fallback={<IconSoundOff size={17} />}>
-            <IconSound size={17} />
-          </Show>
-        </button>
+        <div class={styles.alertGroup} role="group" aria-label="Alertas">
+          <button
+            type="button"
+            class={styles.groupIconBtn}
+            classList={{ [styles.groupIconActive]: app.ui.sound }}
+            onClick={() => app.toggleSound()}
+            aria-pressed={app.ui.sound}
+            title={app.ui.sound ? 'Silenciar alertas sonoras' : 'Activar alertas sonoras'}
+            aria-label="Alertas sonoras"
+          >
+            <Show when={app.ui.sound} fallback={<IconSoundOff size={16} />}>
+              <IconSound size={16} />
+            </Show>
+          </button>
 
-        <button
-          type="button"
-          class={styles.iconBtn}
-          classList={{ [styles.iconActive]: app.ui.notifications }}
-          onClick={() => app.toggleNotifications()}
-          aria-pressed={app.ui.notifications}
-          title={app.ui.notifications ? 'Desactivar avisos' : 'Activar avisos'}
-          aria-label="Avisos de nuevos sismos"
-        >
-          <Show when={app.ui.notifications} fallback={<IconBellOff size={17} />}>
-            <IconBell size={17} />
-          </Show>
-        </button>
+          <button
+            type="button"
+            class={styles.groupIconBtn}
+            classList={{ [styles.groupIconActive]: app.ui.notifications }}
+            onClick={() => app.toggleNotifications()}
+            aria-pressed={app.ui.notifications}
+            title={app.ui.notifications ? 'Desactivar avisos' : 'Activar avisos'}
+            aria-label="Avisos de nuevos sismos"
+          >
+            <Show when={app.ui.notifications} fallback={<IconBellOff size={16} />}>
+              <IconBell size={16} />
+            </Show>
+          </button>
+        </div>
 
         <button
           type="button"
@@ -109,12 +111,14 @@ export default function Header() {
           title="Volver a consultar USGS"
           aria-label="Actualizar datos"
         >
-          <IconRefresh size={17} class={app.snapshot().loading ? styles.spinning : undefined} />
+          <IconRefresh size={16} class={app.snapshot().loading ? styles.spinning : undefined} />
         </button>
+
+        <div class={styles.divider} />
 
         <div class={styles.clock}>
           <span class={styles.clockValue}>{formatClock(app.clockNow())}</span>
-          <span class={styles.clockLabel}>hora local</span>
+          <span class={styles.clockLabel}>Hora local</span>
         </div>
       </div>
     </header>

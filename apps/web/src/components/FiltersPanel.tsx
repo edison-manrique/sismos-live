@@ -101,8 +101,8 @@ export default function FiltersPanel() {
         </div>
       </div>
 
-      <div class={styles.group}>
-        <span class={styles.label}>Ventana temporal</span>
+      <div class={styles.inlineRow}>
+        <span class={styles.label}>Ventana</span>
         <div
           class={`${styles.segmented} ${styles.segmented4}`}
           role="group"
@@ -123,8 +123,8 @@ export default function FiltersPanel() {
         </div>
       </div>
 
-      <div class={styles.group}>
-        <span class={styles.label}>Fuente de datos</span>
+      <div class={styles.inlineRow}>
+        <span class={styles.label}>Fuente</span>
         <div
           class={`${styles.segmented} ${styles.segmented3}`}
           role="group"

@@ -19,6 +19,7 @@
   align-items: center;
   gap: 11px;
   min-width: 0;
+  flex-shrink: 1;
 }
 
 .logo {
@@ -71,6 +72,7 @@
 
 .metrics {
   display: flex;
+  flex-shrink: 0;
   align-items: center;
   gap: var(--space-4);
 }
@@ -103,25 +105,33 @@
   background: var(--border);
 }
 
-/* ── Controles y reloj ───────────────────────────────────────────────────── */
+/* ── Controles y reloj (todos alineados a 32px de alto) ─────────────────── */
 
 .actions {
   display: flex;
+  flex-shrink: 0;
   align-items: center;
   gap: 8px;
-  min-width: 0;
 }
 
 .regionToggle {
   display: inline-flex;
-  padding: 3px;
+  align-items: center;
+  flex-shrink: 0;
+  height: 32px;
+  padding: 2px;
+  gap: 2px;
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   background: var(--surface-inset);
 }
 
 .regionBtn {
-  padding: 5px 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 26px;
+  padding: 0 11px;
   border: 0;
   border-radius: var(--radius-xs);
   background: transparent;
@@ -129,7 +139,7 @@
   font-family: var(--font-sans);
   font-size: var(--text-xs);
   font-weight: var(--fw-semibold);
-  line-height: 1.1;
+  line-height: 1;
   white-space: nowrap;
   transition:
     background var(--dur-fast) var(--ease-out),
@@ -148,19 +158,62 @@
 
 .divider {
   width: 1px;
-  height: 20px;
-  margin: 0 2px;
+  height: 18px;
+  flex-shrink: 0;
   background: var(--border);
 }
 
-.iconBtn {
-  display: grid;
-  place-items: center;
-  width: 34px;
-  height: 34px;
-  border: 1px solid var(--border-subtle);
+.alertGroup {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  height: 32px;
+  padding: 2px;
+  gap: 2px;
+  border: 1px solid var(--border);
   border-radius: var(--radius-sm);
+  background: var(--surface-inset);
+}
+
+.groupIconBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 28px;
+  width: 28px;
+  height: 26px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-xs);
   background: transparent;
+  color: var(--text-mute);
+  transition:
+    color var(--dur-fast) var(--ease-out),
+    background var(--dur-fast) var(--ease-out);
+}
+
+.groupIconBtn:hover {
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.groupIconActive {
+  background: var(--accent-soft);
+  color: var(--accent-2);
+  box-shadow: inset 0 0 0 1px var(--accent-border);
+}
+
+.iconBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 32px;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-inset);
   color: var(--text-dim);
   transition:
     color var(--dur-fast) var(--ease-out),
@@ -170,14 +223,8 @@
 
 .iconBtn:hover {
   color: var(--text);
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--surface-2);
   border-color: var(--border-strong);
-}
-
-.iconActive {
-  color: var(--accent-2);
-  background: var(--accent-soft);
-  border-color: var(--accent-border);
 }
 
 .spinning {
@@ -193,12 +240,13 @@
 .clock {
   display: flex;
   flex-direction: column;
+  justify-content: center;
   align-items: flex-end;
-  gap: 1px;
-  width: 102px;
-  min-width: 102px;
+  gap: 2px;
+  width: 78px;
+  min-width: 78px;
+  height: 32px;
   flex-shrink: 0;
-  padding-left: 4px;
   white-space: nowrap;
 }
 
@@ -209,19 +257,22 @@
   font-size: var(--text-sm);
   font-weight: var(--fw-semibold);
   font-variant-numeric: tabular-nums;
-  line-height: 1.15;
+  letter-spacing: 0.02em;
+  line-height: 1;
   color: var(--text);
 }
 
 .clockLabel {
   color: var(--text-mute);
   font-family: var(--font-sans);
-  font-size: var(--text-2xs);
+  font-size: 9.5px;
   font-weight: var(--fw-medium);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
   line-height: 1;
 }
 
-@media (max-width: 1220px) {
+@media (max-width: 1260px) {
   .metrics {
     display: none;
   }
@@ -237,6 +288,10 @@
     display: none;
   }
 
+  .actions > .divider:last-of-type {
+    display: none;
+  }
+
   .subtitle {
     display: none;
   }
@@ -247,13 +302,8 @@
     display: none;
   }
 
-  .iconBtn {
-    width: 32px;
-    height: 32px;
-  }
-
   .regionBtn {
-    padding: 5px 10px;
+    padding: 0 9px;
   }
 }
 

@@ -1,8 +1,8 @@
 .panel {
   display: flex;
   flex-direction: column;
-  gap: 11px;
-  padding: 12px var(--space-4);
+  gap: 8px;
+  padding: 9px var(--space-4);
   border-bottom: 1px solid var(--border);
   background: var(--bg-1);
 }
@@ -60,8 +60,8 @@
 
 .search {
   width: 100%;
-  height: 34px;
-  padding: 0 32px 0 34px;
+  height: 30px;
+  padding: 0 30px 0 32px;
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   background: var(--surface-inset);
@@ -110,7 +110,7 @@
 .sliderBlock {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
 }
 
 .sliderHead {
@@ -125,25 +125,26 @@
   font-size: var(--text-2xs);
   font-weight: var(--fw-semibold);
   letter-spacing: 0.02em;
+  white-space: nowrap;
 }
 
 .sliderValue {
-  padding: 2px 7px;
+  padding: 1px 6px;
   border: 1px solid var(--accent-border);
   border-radius: var(--radius-xs);
   background: var(--accent-soft);
   color: var(--accent-2);
   font-family: var(--font-mono);
-  font-size: var(--text-xs);
+  font-size: var(--text-2xs);
   font-weight: var(--fw-bold);
   font-variant-numeric: tabular-nums;
-  line-height: 1.2;
+  line-height: 1.25;
 }
 
 .rangeTrackWrap {
   display: flex;
   align-items: center;
-  height: 18px;
+  height: 15px;
 }
 
 .range {
@@ -248,21 +249,22 @@
   color: var(--accent-2);
 }
 
-/* ── Segmented controls alineados al 100% sin saltos de línea ───────────── */
+/* ── Controles segmentados compactos en línea (estilo Recientes|Intensidad) */
 
-.group {
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
+.inlineRow {
+  display: grid;
+  grid-template-columns: 58px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
   min-width: 0;
 }
 
 .segmented {
   display: grid;
-  gap: 3px;
-  padding: 3px;
+  gap: 2px;
+  padding: 2px;
   border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-xs);
   background: var(--surface-inset);
 }
 
@@ -278,61 +280,57 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
+  gap: 5px;
   min-width: 0;
-  height: 28px;
-  padding: 0 6px;
-  border: 1px solid transparent;
-  border-radius: var(--radius-xs);
+  height: 23px;
+  padding: 0 5px;
+  border: 0;
+  border-radius: 4px;
   background: transparent;
-  color: var(--text-dim);
+  color: var(--text-mute);
   font-family: var(--font-sans);
-  font-size: var(--text-xs);
-  font-weight: var(--fw-medium);
+  font-size: var(--text-2xs);
+  font-weight: var(--fw-semibold);
   white-space: nowrap;
   transition:
     color var(--dur-fast) var(--ease-out),
-    background var(--dur-fast) var(--ease-out),
-    border-color var(--dur-fast) var(--ease-out);
+    background var(--dur-fast) var(--ease-out);
 }
 
 .segmentBtn:hover {
-  color: var(--text);
-  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-dim);
 }
 
 .segmentActive {
-  border-color: var(--accent-border);
   background: var(--surface-3);
   color: var(--accent-2);
-  font-weight: var(--fw-semibold);
 }
 
 .sourceDot {
-  width: 6px;
-  height: 6px;
+  width: 5px;
+  height: 5px;
   flex-shrink: 0;
   border-radius: 50%;
 }
 
 @media (max-height: 860px) {
   .panel {
-    gap: 9px;
-    padding: 10px var(--space-4);
+    gap: 7px;
+    padding: 8px var(--space-4);
   }
 
   .search {
-    height: 32px;
+    height: 28px;
   }
 
   .segmentBtn {
-    height: 26px;
+    height: 22px;
   }
 }
 
 @media (max-width: 820px) {
   .panel {
-    padding: 10px var(--space-4);
-    gap: 9px;
+    padding: 8px var(--space-4);
+    gap: 7px;
   }
 }
