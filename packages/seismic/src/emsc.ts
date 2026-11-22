@@ -33,8 +33,8 @@ export interface EmscSocketOptions {
 
 /**
  * Cliente resiliente para el WebSocket de EMSC:
- * keep-alive cada 15 s, reconexión con backoff exponencial + jitter y
- * normalización de cada mensaje a {@link EarthquakeEvent}.
+ * keep-alive cada 15 s con watchdog de inactividad, reconexión inmediata tras caída/red,
+ * backoff exponencial con jitter y normalización de cada mensaje a {@link EarthquakeEvent}.
  *
  * El filtrado geográfico/magnitud se hace en el cliente (ver `EarthquakeFeed`).
  */
@@ -50,6 +50,7 @@ export class EmscSocket {
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private manuallyClosed = false;
   private attempts = 0;
+  private lastActivityAt = 0;
 
   status: ConnectionStatus = 'idle';
 
@@ -65,6 +66,11 @@ export class EmscSocket {
     return this.socket?.readyState === 1;
   }
 
+  /** Timestamp epoch ms de la última actividad recibida o apertura del socket. */
+  get lastActivity(): number {
+    return this.lastActivityAt;
+  }
+
   /** Número de intentos de reconexión consecutivos. */
   get reconnectAttempt(): number {
     return this.attempts;
@@ -73,6 +79,11 @@ export class EmscSocket {
   connect(): void {
     this.manuallyClosed = false;
     if (this.socket && (this.socket.readyState === 0 || this.socket.readyState === 1)) return;
+
+    if (this.socket) {
+      this.detachSocket(this.socket);
+      this.socket = null;
+    }
 
     this.clearReconnectTimer();
     this.setStatus(this.attempts > 0 ? 'reconnecting' : 'connecting');
@@ -89,22 +100,29 @@ export class EmscSocket {
     this.socket = socket;
 
     socket.onopen = () => {
+      if (this.socket !== socket) return;
       this.attempts = 0;
+      this.lastActivityAt = Date.now();
       this.setStatus('open');
       this.startPing();
     };
 
     socket.onmessage = (event: MessageEvent) => {
+      if (this.socket !== socket) return;
+      this.lastActivityAt = Date.now();
       this.handleMessage(event);
     };
 
     socket.onerror = () => {
+      if (this.socket !== socket) return;
       // El evento `close` suele llegar después y dispara la reconexión.
       this.reportError(new Error('Error de conexión con EMSC'));
     };
 
     socket.onclose = (event: CloseEvent) => {
+      if (this.socket !== socket) return;
       this.stopPing();
+      this.detachSocket(socket);
       this.socket = null;
       if (this.manuallyClosed) {
         this.setStatus('closed');
@@ -117,6 +135,33 @@ export class EmscSocket {
     };
   }
 
+  /** Fuerza reconexión inmediata si el socket está caído o silencioso (p. ej. tras suspensión). */
+  reconnect(): void {
+    if (this.manuallyClosed) return;
+    const staleLimit = Math.max(this.pingInterval * 2.5, 35_000);
+    const isStale = this.isOpen && this.lastActivityAt > 0 && Date.now() - this.lastActivityAt > staleLimit;
+
+    if (this.isOpen && !isStale) return;
+
+    if (this.socket) {
+      const old = this.socket;
+      this.stopPing();
+      this.detachSocket(old);
+      this.socket = null;
+      try {
+        if (old.readyState === 0 || old.readyState === 1) {
+          old.close(4000, 'reconexión forzada');
+        }
+      } catch {
+        /* noop */
+      }
+    }
+
+    this.attempts = 0;
+    this.clearReconnectTimer();
+    this.connect();
+  }
+
   /** Cierra el socket y cancela cualquier reconexión pendiente. */
   close(): void {
     this.manuallyClosed = true;
@@ -124,10 +169,20 @@ export class EmscSocket {
     this.clearReconnectTimer();
     const socket = this.socket;
     this.socket = null;
-    if (socket && (socket.readyState === 0 || socket.readyState === 1)) {
-      socket.close(1000, 'cliente cerrado');
+    if (socket) {
+      this.detachSocket(socket);
+      if (socket.readyState === 0 || socket.readyState === 1) {
+        socket.close(1000, 'cliente cerrado');
+      }
     }
     this.setStatus('closed');
+  }
+
+  private detachSocket(socket: WebSocket): void {
+    socket.onopen = null;
+    socket.onmessage = null;
+    socket.onerror = null;
+    socket.onclose = null;
   }
 
   private handleMessage(event: MessageEvent): void {
@@ -150,12 +205,18 @@ export class EmscSocket {
 
   private startPing(): void {
     this.stopPing();
+    const staleThreshold = Math.max(this.pingInterval * 2.5, 35_000);
     this.pingTimer = setInterval(() => {
       if (!this.isOpen) return;
+      if (this.lastActivityAt > 0 && Date.now() - this.lastActivityAt > staleThreshold) {
+        // El socket quedó semiabierto sin responder pings: recicla conexión.
+        this.reconnect();
+        return;
+      }
       try {
         this.socket?.send('ping');
       } catch {
-        // Si falla, `close` disparará la reconexión.
+        this.reconnect();
       }
     }, this.pingInterval);
   }

@@ -11,13 +11,13 @@
 
 ## Características principales
 
-- **Fuentes duales en tiempo real**: recepción continua vía WebSocket desde **EMSC SeismicPortal** (`ping` keep-alive cada 15 s y reconexión exponencial con jitter) combinada con sincronización histórica y polling de respaldo desde **USGS FDSN**.
+- **Fuentes duales en tiempo real**: recepción continua vía WebSocket desde **EMSC SeismicPortal** (`ping` keep-alive cada 15 s, watchdog de inactividad y reconexión exponencial con jitter) combinada con recuperación inmediata al volver a estar en línea o visible la pestaña, y sincronización **USGS FDSN** adaptativa e incremental (deltas de 30 min cada 5 min con WS sano o respaldo cada 90 s si cae).
 - **Foco territorial de Perú**: visualización de límites terrestres reales obtenidos desde APIs públicas abiertas (**geoBoundaries** y **OpenDataSoft**, sin relleno interior) y filtrado sísmico que abarca territorio nacional más franja de subducción costera.
 - **Motor cartográfico propio (`@sismos/geomap`)**: proyección Web Mercator sin dependencias externas, pirámide de teselas retenida entre niveles de zoom (sin parpadeos ni fondos en negro durante `flyTo`), zoom centrado en el cursor y asentamiento en niveles enteros nítidos.
 - **Cuatro capas base sin API key**: **Estándar** (OSM Standard), **Claro** (OSM DE), **Satélite** (Esri World Imagery) y **Topográfico** (OpenTopoMap).
-- **Sistema de alarmas y alertas**: notificaciones toast persistentes con acción directa (`Ver`), alarma WebAudio escalonada por magnitud (tono estándar, pulso urgente para `M ≥ 4.5` y sirena de emergencia de 12 s para `M ≥ 6.0`) y notificaciones del navegador.
-- **Ficha técnica enriquecida**: magnitud y escala (`Mw`, `ML`, `mb`), agencia/red reportante, estado de revisión, profundidad clasificada, alerta PAGER, intensidad instrumental/percibida (`MMI` / `CDI`), reportes *"Lo sentí"*, estaciones/brecha azimutal, RMS, relevancia y enlace oficial verificado tanto en USGS como en EMSC (`source_id`).
-- **Tipografía e interfaz modular**: sistema de tokens centralizado (`styles/tokens.css`) con **Plus Jakarta Sans** (UI), **Gemunu Libre** (display numérico) y **JetBrains Mono** (telemetría tabular), reloj de ancho constante, selección protegida y persistencia local de preferencias (`localStorage`).
+- **Sistema de alarmas y alertas**: notificaciones toast persistentes con acción directa (`Ver`), alarma WebAudio escalonada por magnitud (tono estándar, pulso urgente para `M ≥ 4.5` y sirena de emergencia de 12 s para `M ≥ 6.0` con control anti-solapamiento), protección ante lotes históricos tras recuperación de red y notificaciones del navegador.
+- **Ficha técnica y filtros refinados**: controles segmentados alineados para ventana temporal (`1 h`, `24 h`, `7 d`, `Todo`) y fuente (`Todas`, `EMSC`, `USGS`), deslizador de magnitud con atajos rápidos (`M 0` a `M 7.5`), ficha enriquecida (`Mw`, `ML`, `mb`, agencia, estado, PAGER, `MMI`/`CDI`, reportes *"Lo sentí"*, estaciones/gap/RMS y enlace oficial EMSC por `source_id`) y badges de magnitud calibrados en **JetBrains Mono** (`tabular-nums`).
+- **Tipografía e interfaz modular**: sistema de tokens centralizado (`styles/tokens.css`) con **Plus Jakarta Sans** (UI), **Gemunu Libre** (display de marca) y **JetBrains Mono** (telemetría y grados sísmicos), reloj de ancho constante, selección protegida y persistencia local de preferencias (`localStorage`).
 
 ---
 
@@ -118,7 +118,7 @@ const feed = new EarthquakeFeed({
   usgs: { minMagnitude: 2.5, limit: 1500, orderBy: 'time' },
   usgsDays: 7,
   maxEvents: 4000,
-  pollInterval: 90_000, // Polling USGS de respaldo si el WebSocket se desconecta
+  pollInterval: 90_000, // Respaldo rápido si el WS cae; deltas cada 5 min con WS sano
 });
 
 const DEFAULT_FILTERS = {
@@ -145,8 +145,8 @@ VITE_BASE_PATH=/
 
 | Servicio | Endpoint / Proveedor | Protocolo | Uso |
 |----------|----------------------|-----------|-----|
-| **EMSC** | `wss://www.seismicportal.eu/standing_order/websocket` | WebSocket | Streaming global en vivo (keep-alive 15 s) |
-| **USGS** | `https://earthquake.usgs.gov/fdsnws/event/1/query` | HTTPS REST | Carga inicial de 7 días y polling de respaldo |
+| **EMSC** | `wss://www.seismicportal.eu/standing_order/websocket` | WebSocket | Streaming global en vivo (keep-alive 15 s + watchdog) |
+| **USGS** | `https://earthquake.usgs.gov/fdsnws/event/1/query` | HTTPS REST | Carga inicial de 7 días y sincronización delta adaptativa |
 | **Límites terrestres** | geoBoundaries (`v6.0.0`) / OpenDataSoft | HTTPS JSON | Contorno terrestre exacto de Perú |
 | **Límite sísmico marítimo** | Nominatim (OpenStreetMap) | HTTPS JSON | Cobertura costera de subducción en el Pacífico |
 | **Teselas base** | OSM Standard · OSM DE · Esri World Imagery · OpenTopoMap | HTTPS PNG/JPG | Capas cartográficas del mapa |

@@ -80,12 +80,12 @@
 .item {
   position: relative;
   display: grid;
-  grid-template-columns: 44px minmax(0, 1fr) 14px;
+  grid-template-columns: 48px minmax(0, 1fr) 14px;
   align-items: center;
-  gap: 10px;
+  gap: 11px;
   width: 100%;
-  margin-bottom: 3px;
-  padding: 8px 9px;
+  margin-bottom: 4px;
+  padding: 8px 10px;
   border: 1px solid transparent;
   border-radius: var(--radius-sm);
   background: transparent;
@@ -111,29 +111,42 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  width: 44px;
+  gap: 2px;
+  width: 48px;
   height: 44px;
-  border: 1px solid color-mix(in srgb, var(--mag-color) 42%, transparent);
+  border: 1px solid color-mix(in srgb, var(--mag-color) 34%, var(--border));
   border-radius: var(--radius-sm);
-  background: color-mix(in srgb, var(--mag-color) 14%, transparent);
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--mag-color) 12%, var(--surface-2)),
+    color-mix(in srgb, var(--mag-color) 4%, var(--bg-1))
+  );
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--mag-color) 28%, transparent);
   color: var(--mag-color);
+  transition: border-color var(--dur-fast) var(--ease-out);
+}
+
+.item:hover .mag,
+.itemActive .mag {
+  border-color: color-mix(in srgb, var(--mag-color) 54%, var(--border));
 }
 
 .magValue {
-  font-family: var(--font-display);
-  font-size: 21px;
+  font-family: var(--font-mono);
+  font-size: 16px;
   font-weight: var(--fw-bold);
   line-height: 1;
+  letter-spacing: -0.04em;
   font-variant-numeric: tabular-nums;
 }
 
 .magUnit {
-  margin-top: 1px;
-  color: color-mix(in srgb, var(--mag-color) 70%, var(--text-mute));
-  font-family: var(--font-mono);
+  color: color-mix(in srgb, var(--mag-color) 62%, var(--text-dim));
+  font-family: var(--font-sans);
   font-size: 8.5px;
-  font-weight: var(--fw-semibold);
-  letter-spacing: 0.06em;
+  font-weight: var(--fw-bold);
+  letter-spacing: 0.1em;
+  line-height: 1;
 }
 
 .body {

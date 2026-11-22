@@ -264,12 +264,23 @@ async function playSiren12s(): Promise<void> {
   }
 }
 
+let activeSirenUntil = 0;
+let lastChimeAt = 0;
+
 /** Alarma sonora sísmica: doble tono, pulso urgente (M >= 4.5) y sirena 12s (M >= 6.0). */
 async function playChime(magnitude = 4.0): Promise<void> {
+  const nowMs = Date.now();
   if (magnitude >= 6.0) {
+    activeSirenUntil = nowMs + 12_200;
+    lastChimeAt = nowMs;
     await playSiren12s();
     return;
   }
+
+  if (nowMs < activeSirenUntil || nowMs - lastChimeAt < 1200) {
+    return;
+  }
+  lastChimeAt = nowMs;
 
   try {
     const ctx = getAudioContext();
@@ -326,7 +337,8 @@ function createAppState(): AppState {
   const toastTimers = new Map<string, number>();
   const knownIds = new Set<string>();
   const recentAlerted: Array<{ timestamp: number; lat: number; lon: number }> = [];
-  let baselineReady = false;
+  const bootAt = Date.now();
+  let initialUsgsRecorded = false;
 
   const cachedPeru = loadCachedPeruBoundaries();
   const [peruVisualPolygons, setPeruVisualPolygons] = createSignal<LatLng[][] | null>(
@@ -419,16 +431,18 @@ function createAppState(): AppState {
     showBrowserNotification(event);
   };
 
-  // Detecta eventos nuevos después de completar la sincronización inicial para lanzar alarmas.
+  // Detecta eventos nuevos sin disparar alertas por el lote histórico inicial de USGS.
   createEffect(() => {
     const snap = snapshot();
-    if (!baselineReady) {
-      const initialSettled = snap.lastSyncAt != null || (!snap.loading && snap.error != null);
-      if (initialSettled) {
-        baselineReady = true;
-        for (const event of snap.events) knownIds.add(event.id);
+    if (!initialUsgsRecorded) {
+      if (snap.lastSyncAt != null) {
+        initialUsgsRecorded = true;
+        for (const event of snap.events) {
+          if (event.source === 'USGS') knownIds.add(event.id);
+        }
+      } else if (snap.loading || snap.events.length === 0) {
+        return;
       }
-      return;
     }
 
     const fresh: EarthquakeEvent[] = [];
@@ -449,6 +463,8 @@ function createAppState(): AppState {
     );
 
     for (const event of fresh) {
+      // Antes de la primera sincronización USGS, solo alertan sismos en vivo posteriores al arranque.
+      if (!initialUsgsRecorded && event.timestamp < bootAt - 2 * 60_000) continue;
       if (Date.now() - event.timestamp > 60 * 60_000) continue;
       if (
         !matchesFilter(event, {
@@ -484,8 +500,21 @@ function createAppState(): AppState {
     const clockTicker = window.setInterval(() => setClockNow(Date.now()), 1_000);
 
     const onGesture = () => unlockAudio();
+    const onOnline = () => {
+      setNow(Date.now());
+      feed.reconnect();
+    };
+    const onVisibilityChange = () => {
+      if (document.visibilityState !== 'visible') return;
+      setNow(Date.now());
+      setClockNow(Date.now());
+      feed.reconnect();
+    };
+
     window.addEventListener('pointerdown', onGesture, { passive: true });
     window.addEventListener('keydown', onGesture, { passive: true });
+    window.addEventListener('online', onOnline);
+    document.addEventListener('visibilitychange', onVisibilityChange);
 
     const borderController = new AbortController();
     void fetchPeruBoundaries({ signal: borderController.signal })
@@ -505,6 +534,8 @@ function createAppState(): AppState {
       clearInterval(clockTicker);
       window.removeEventListener('pointerdown', onGesture);
       window.removeEventListener('keydown', onGesture);
+      window.removeEventListener('online', onOnline);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
       for (const timer of toastTimers.values()) clearTimeout(timer);
       toastTimers.clear();
     });

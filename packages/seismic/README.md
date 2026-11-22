@@ -6,10 +6,10 @@ Librería TypeScript para consumo y normalización de actividad sísmica en tiem
 
 ## Características principales
 
-- **EMSC WebSocket (`EmscSocket`)**: conexión persistente a `wss://www.seismicportal.eu/standing_order/websocket` con *keep-alive* `ping` cada 15 s, reconexión exponencial con jitter y generación automática de enlace oficial EMSC a partir de `properties.source_id` (con respaldo a SeismicPortal por `unid`).
+- **EMSC WebSocket (`EmscSocket`)**: conexión persistente a `wss://www.seismicportal.eu/standing_order/websocket` con *keep-alive* `ping` cada 15 s, watchdog de inactividad (recicla sockets semiabiertos tras superar `max(pingInterval * 2.5, 35 s)`), reconexión exponencial con jitter, método `reconnect()` para recuperación inmediata y generación automática de enlace oficial EMSC a partir de `properties.source_id`.
 - **USGS REST (`fetchUsgsEvents`)**: consulta directa al endpoint FDSN (`https://earthquake.usgs.gov/fdsnws/event/1/query`) con soporte para ventana temporal, magnitud mínima, caja geográfica y paginación.
 - **Normalización unificada (`EarthquakeEvent`)**: combina metadatos básicos (magnitud, escala, profundidad, coordenadas, timestamp, alerta PAGER, tsunami) con telemetría avanzada (`status`, `agency`, `felt`, `cdi`, `mmi`, `significance`, `stations`, `gap`, `rms`, `nearestStationKm`).
-- **Feed reactivo (`EarthquakeFeed`)**: sincronización inicial USGS + streaming EMSC + polling de respaldo configurable cuando el socket no está abierto, con control máximo de memoria (`maxEvents`).
+- **Feed reactivo (`EarthquakeFeed`)**: sincronización inicial USGS + streaming EMSC + polling adaptativo e incremental (deltas con solapamiento de 30 min cada 5 min cuando el WS está sano o cada `pollInterval` cuando está caído), `reconnect()` tras suspensión/red y control máximo de memoria (`maxEvents`).
 - **Límites geográficos de Perú (`peruBorder.ts` + `utils.ts`)**: obtención de fronteras terrestres reales sin API key (**geoBoundaries** y **OpenDataSoft** con caché en `localStorage`) separadas del polígono de cobertura marítima (Nominatim / respaldo local) para capturar sismos de subducción costera sin invadir países vecinos.
 
 ---
@@ -74,7 +74,7 @@ interface FeedOptions {
   emscUrl?: string | null | false;
   pingInterval?: number;            // Por defecto: 15000 ms
   maxEvents?: number;               // Por defecto: 3000
-  pollInterval?: number;            // Por defecto: 90000 ms (0 desactiva)
+  pollInterval?: number;            // Respaldo con WS caído (90000 ms; 0 desactiva; con WS sano sincroniza deltas cada 5 min)
   fetchImpl?: typeof fetch;
   WebSocketImpl?: typeof WebSocket;
   onSnapshot?: (snapshot: FeedSnapshot) => void;
@@ -85,7 +85,8 @@ interface FeedOptions {
 Métodos principales:
 - `subscribe(listener) => () => void`
 - `start()` / `stop()` / `destroy()`
-- `refresh(): Promise<void>`
+- `refresh(): Promise<void>` — consulta REST completa a USGS
+- `reconnect(): void` — reconecta el WebSocket si está caído o silencioso y sincroniza deltas USGS si hay desfase (> 60 s)
 - `setFilter(partial: EventFilter)` / `getFilter(): EventFilter`
 - `getSnapshot(): FeedSnapshot`
 - `getAllEvents(): EarthquakeEvent[]`
@@ -101,6 +102,10 @@ const socket = new EmscSocket({
   onStatus: (status, detail) => console.log(status, detail),
 });
 socket.connect();
+
+// Recuperación inmediata (p. ej., eventos `online` o `visibilitychange`):
+socket.reconnect();
+// Propiedades útiles: `socket.isOpen`, `socket.lastActivity`, `socket.reconnectAttempt`
 
 const usgsResult = await fetchUsgsEvents({
   startTime: Date.now() - 7 * 86_400_000,

@@ -9,6 +9,8 @@ const SOURCES: Array<{ id: SourceMode; label: string; tone: string }> = [
   { id: 'USGS', label: 'USGS', tone: 'var(--cyan)' },
 ];
 
+const MAG_TICKS = [0, 2.5, 5, 7.5] as const;
+
 export default function FiltersPanel() {
   const app = useApp();
 
@@ -63,65 +65,84 @@ export default function FiltersPanel() {
           <label class={styles.label} for="magnitude-range">
             Magnitud mínima
           </label>
-          <span class={styles.sliderValue}>M {app.filters.minMagnitude.toFixed(1)}</span>
+          <span class={styles.sliderValue}>M {app.filters.minMagnitude.toFixed(1)}+</span>
         </div>
-        <input
-          id="magnitude-range"
-          class={styles.range}
-          type="range"
-          min="0"
-          max="7.5"
-          step="0.1"
-          value={app.filters.minMagnitude}
-          style={`--fill:${fill()}`}
-          onInput={(event) =>
-            app.setFilters('minMagnitude', Number(event.currentTarget.value))
-          }
-        />
-        <div class={styles.rangeScale}>
-          <span>0</span>
-          <span>2.5</span>
-          <span>5</span>
-          <span>7.5</span>
+        <div class={styles.rangeTrackWrap}>
+          <input
+            id="magnitude-range"
+            class={styles.range}
+            type="range"
+            min="0"
+            max="7.5"
+            step="0.1"
+            value={app.filters.minMagnitude}
+            style={`--fill:${fill()}`}
+            onInput={(event) =>
+              app.setFilters('minMagnitude', Number(event.currentTarget.value))
+            }
+          />
+        </div>
+        <div class={styles.rangeScale} aria-label="Atajos de magnitud mínima">
+          <For each={MAG_TICKS}>
+            {(tick) => (
+              <button
+                type="button"
+                class={styles.scaleTick}
+                classList={{
+                  [styles.scaleTickActive]: Math.abs(app.filters.minMagnitude - tick) < 0.05,
+                }}
+                onClick={() => app.setFilters('minMagnitude', tick)}
+                title={`Filtrar desde M ${tick.toFixed(1)}`}
+              >
+                M {tick === 0 || tick === 5 ? tick : tick.toFixed(1)}
+              </button>
+            )}
+          </For>
         </div>
       </div>
 
-      <div class={styles.filterRow}>
-        <div class={styles.group}>
-          <span class={styles.label}>Ventana</span>
-          <div class={styles.chips} role="group" aria-label="Ventana temporal">
-            <For each={TIME_WINDOWS}>
-              {(window) => (
-                <button
-                  type="button"
-                  class={styles.chip}
-                  classList={{ [styles.chipActive]: app.filters.range === window.id }}
-                  onClick={() => app.setFilters('range', window.id)}
-                >
-                  {window.label}
-                </button>
-              )}
-            </For>
-          </div>
+      <div class={styles.group}>
+        <span class={styles.label}>Ventana temporal</span>
+        <div
+          class={`${styles.segmented} ${styles.segmented4}`}
+          role="group"
+          aria-label="Ventana temporal"
+        >
+          <For each={TIME_WINDOWS}>
+            {(window) => (
+              <button
+                type="button"
+                class={styles.segmentBtn}
+                classList={{ [styles.segmentActive]: app.filters.range === window.id }}
+                onClick={() => app.setFilters('range', window.id)}
+              >
+                {window.label}
+              </button>
+            )}
+          </For>
         </div>
+      </div>
 
-        <div class={styles.group}>
-          <span class={styles.label}>Fuente</span>
-          <div class={styles.chips} role="group" aria-label="Fuente de datos">
-            <For each={SOURCES}>
-              {(source) => (
-                <button
-                  type="button"
-                  class={styles.chip}
-                  classList={{ [styles.chipActive]: app.filters.source === source.id }}
-                  onClick={() => app.setFilters('source', source.id)}
-                >
-                  <span class={styles.sourceDot} style={{ background: source.tone }} />
-                  {source.label}
-                </button>
-              )}
-            </For>
-          </div>
+      <div class={styles.group}>
+        <span class={styles.label}>Fuente de datos</span>
+        <div
+          class={`${styles.segmented} ${styles.segmented3}`}
+          role="group"
+          aria-label="Fuente de datos"
+        >
+          <For each={SOURCES}>
+            {(source) => (
+              <button
+                type="button"
+                class={styles.segmentBtn}
+                classList={{ [styles.segmentActive]: app.filters.source === source.id }}
+                onClick={() => app.setFilters('source', source.id)}
+              >
+                <span class={styles.sourceDot} style={{ background: source.tone }} />
+                {source.label}
+              </button>
+            )}
+          </For>
         </div>
       </div>
     </section>

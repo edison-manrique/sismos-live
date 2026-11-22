@@ -28,6 +28,7 @@ export interface FeedOptions {
   maxEvents?: number;
   /**
    * Mientras el socket está caído se refresca USGS con este intervalo (ms).
+   * Cuando el socket está sano, se sincronizan solo deltas cada ~5 min para enriquecer telemetría.
    * `0` desactiva el polling. Por defecto 90000.
    */
   pollInterval?: number;
@@ -39,17 +40,13 @@ export interface FeedOptions {
 
 const DEFAULT_MAX_EVENTS = 3000;
 const DEFAULT_POLL_INTERVAL = 90_000;
+const HEALTHY_WS_SYNC_INTERVAL = 300_000;
+const DELTA_OVERLAP_MS = 30 * 60_000;
 const DAY_MS = 86_400_000;
 
 /**
  * Feed unificado: carga inicial desde USGS, streaming en vivo desde EMSC,
- * deduplicación/upsert por `id` y filtrado en memoria.
- *
- * ```ts
- * const feed = new EarthquakeFeed({ filter: { bounds: PERU_BOUNDS } });
- * feed.subscribe((snapshot) => console.log(snapshot.events));
- * feed.start();
- * ```
+ * polling incremental adaptativo, deduplicación/upsert por `id` y filtrado en memoria.
  */
 export class EarthquakeFeed {
   private readonly options: FeedOptions;
@@ -98,7 +95,7 @@ export class EarthquakeFeed {
     this.started = true;
     this.connectSocket();
     this.startPolling();
-    void this.loadInitial();
+    void this.loadInitial(false);
   }
 
   /** Detiene el streaming, el polling y las peticiones en curso. */
@@ -126,9 +123,18 @@ export class EarthquakeFeed {
     return this.started;
   }
 
-  /** Fuerza una nueva consulta REST a USGS. */
+  /** Fuerza una consulta REST completa a USGS. */
   async refresh(): Promise<void> {
-    await this.loadInitial();
+    await this.loadInitial(false);
+  }
+
+  /** Reconecta WebSocket si hace falta y sincroniza deltas USGS tras suspensión o caída de red. */
+  reconnect(): void {
+    if (!this.started) return;
+    this.socket?.reconnect();
+    if (!this.loading && (this.lastSyncAt == null || Date.now() - this.lastSyncAt > 60_000)) {
+      void this.loadInitial(this.lastSyncAt != null);
+    }
   }
 
   /** Actualiza parcialmente el filtro (se aplica en memoria, sin reconectar). */
@@ -182,12 +188,16 @@ export class EarthquakeFeed {
     const interval = this.options.pollInterval ?? DEFAULT_POLL_INTERVAL;
     if (interval <= 0 || this.pollTimer != null) return;
     this.pollTimer = setInterval(() => {
-      if (!this.started) return;
-      void this.refresh();
+      if (!this.started || this.loading) return;
+      const wsOpen = Boolean(this.socket?.isOpen);
+      if (wsOpen && this.lastSyncAt != null && Date.now() - this.lastSyncAt < HEALTHY_WS_SYNC_INTERVAL) {
+        return;
+      }
+      void this.loadInitial(this.lastSyncAt != null);
     }, interval);
   }
 
-  private async loadInitial(): Promise<void> {
+  private async loadInitial(incremental: boolean): Promise<void> {
     if (this.usgsOptions === false) {
       this.loading = false;
       this.notify();
@@ -200,9 +210,12 @@ export class EarthquakeFeed {
     this.loading = true;
     this.notify();
 
+    const fullWindowStart = Date.now() - this.usgsDays * DAY_MS;
     const startTime = this.hasCustomStart
       ? this.usgsOptions.startTime
-      : Date.now() - this.usgsDays * DAY_MS;
+      : incremental && this.lastSyncAt != null
+        ? Math.max(fullWindowStart, this.lastSyncAt - DELTA_OVERLAP_MS)
+        : fullWindowStart;
 
     try {
       const result = await fetchUsgsEvents({
