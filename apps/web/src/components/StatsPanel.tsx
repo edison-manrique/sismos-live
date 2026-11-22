@@ -7,7 +7,7 @@ import {
   timeAgo,
 } from '@sismos/seismic';
 import { TIME_WINDOWS, useApp } from '../state';
-import styles from './StatsPanel.module.css';
+import styles from '../styles/components/StatsPanel.module.css';
 
 export default function StatsPanel() {
   const app = useApp();
@@ -90,7 +90,7 @@ export default function StatsPanel() {
 
       <div class={styles.meta}>
         <span class={styles.metaItem}>
-          <span class={styles.metaLabel}>24 h</span>
+          <span class={styles.metaLabel}>Últ. 24 h</span>
           <strong>{formatNumber(app.stats().lastDay)}</strong>
         </span>
         <span class={styles.metaItem}>
@@ -98,7 +98,7 @@ export default function StatsPanel() {
           <strong>{formatDepth(app.stats().avgDepth)}</strong>
         </span>
         <span class={styles.metaItem}>
-          <span class={styles.metaLabel}>Fuentes</span>
+          <span class={styles.metaLabel}>EMSC / USGS</span>
           <strong>
             {app.stats().bySource.EMSC} <span class={styles.metaSep}>/</span>{' '}
             {app.stats().bySource.USGS}
@@ -108,7 +108,6 @@ export default function StatsPanel() {
 
       {latest() ? (
         <div class={styles.latest}>
-          <span class={styles.latestDot} />
           <span class={styles.latestText}>
             Último: <strong>{latest()?.place}</strong>
           </span>

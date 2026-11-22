@@ -17,7 +17,7 @@
 - **Cuatro capas base sin API key**: **Estándar** (OSM Standard), **Claro** (OSM DE), **Satélite** (Esri World Imagery) y **Topográfico** (OpenTopoMap).
 - **Sistema de alarmas y alertas**: notificaciones toast persistentes con acción directa (`Ver`), alarma WebAudio escalonada por magnitud (tono estándar, pulso urgente para `M ≥ 4.5` y sirena de emergencia de 12 s para `M ≥ 6.0`) y notificaciones del navegador.
 - **Ficha técnica enriquecida**: magnitud y escala (`Mw`, `ML`, `mb`), agencia/red reportante, estado de revisión, profundidad clasificada, alerta PAGER, intensidad instrumental/percibida (`MMI` / `CDI`), reportes *"Lo sentí"*, estaciones/brecha azimutal, RMS, relevancia y enlace oficial verificado tanto en USGS como en EMSC (`source_id`).
-- **Tipografía e interfaz compacta**: diseño responsivo con **Gemunu Libre** + **Aldrich**, reloj de ancho constante, selección de texto protegida y persistencia local de preferencias (`localStorage`).
+- **Tipografía e interfaz modular**: sistema de tokens centralizado (`styles/tokens.css`) con **Plus Jakarta Sans** (UI), **Gemunu Libre** (display numérico) y **JetBrains Mono** (telemetría tabular), reloj de ancho constante, selección protegida y persistencia local de preferencias (`localStorage`).
 
 ---
 
@@ -66,9 +66,11 @@ sismos-live/
         ├── src/
         │   ├── main.tsx
         │   ├── App.tsx
-        │   ├── App.module.css
-        │   ├── global.css
         │   ├── state.tsx               # Store reactivo, audio WebAudio, toasts y filtros
+        │   ├── styles/
+        │   │   ├── tokens.css          # Variables globales (fuentes, colores, escala, radios)
+        │   │   ├── global.css          # Base, resets y scrollbars
+        │   │   └── components/         # CSS Modules de App, Header, Sidebar, StatsPanel, FiltersPanel, EventList, MapPanel, Toasts
         │   └── components/             # Header, Sidebar, StatsPanel, FiltersPanel, EventList, MapPanel, Toasts, Icons
         ├── vite.config.ts
         ├── tsconfig.json

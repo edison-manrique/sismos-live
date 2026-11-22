@@ -5,21 +5,23 @@ import StatsPanel from './StatsPanel';
 import FiltersPanel from './FiltersPanel';
 import EventList from './EventList';
 import { IconChevron } from './Icons';
-import styles from './Sidebar.module.css';
+import styles from '../styles/components/Sidebar.module.css';
 
 function SidebarFooter() {
   const app = useApp();
   return (
     <footer class={styles.footer}>
       <div class={styles.footerRow}>
-        <span class={styles.footerSource}>
-          <span class={styles.footerDot} data-source="USGS" />
-          USGS REST
-        </span>
-        <span class={styles.footerSource}>
-          <span class={styles.footerDot} data-source="EMSC" />
-          EMSC WS
-        </span>
+        <div class={styles.footerSources}>
+          <span class={styles.footerSource}>
+            <span class={styles.footerDot} data-source="USGS" />
+            USGS REST
+          </span>
+          <span class={styles.footerSource}>
+            <span class={styles.footerDot} data-source="EMSC" />
+            EMSC WS
+          </span>
+        </div>
         <span class={styles.footerMemory}>
           {formatNumber(app.snapshot().total)} en memoria
         </span>

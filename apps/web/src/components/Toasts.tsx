@@ -2,7 +2,7 @@ import { For } from 'solid-js';
 import { formatDepth, formatMagnitude, magnitudeColor, timeAgo } from '@sismos/seismic';
 import { useApp } from '../state';
 import { IconClose } from './Icons';
-import styles from './Toasts.module.css';
+import styles from '../styles/components/Toasts.module.css';
 
 export default function Toasts() {
   const app = useApp();

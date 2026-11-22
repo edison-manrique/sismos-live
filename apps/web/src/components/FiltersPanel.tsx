@@ -1,7 +1,7 @@
 import { For, Show, createMemo } from 'solid-js';
 import { useApp, TIME_WINDOWS, type SourceMode } from '../state';
 import { IconClose, IconSearch } from './Icons';
-import styles from './FiltersPanel.module.css';
+import styles from '../styles/components/FiltersPanel.module.css';
 
 const SOURCES: Array<{ id: SourceMode; label: string; tone: string }> = [
   { id: 'all', label: 'Todas', tone: 'var(--text-dim)' },
@@ -86,40 +86,42 @@ export default function FiltersPanel() {
         </div>
       </div>
 
-      <div class={styles.group}>
-        <span class={styles.label}>Ventana temporal</span>
-        <div class={styles.chips} role="group" aria-label="Ventana temporal">
-          <For each={TIME_WINDOWS}>
-            {(window) => (
-              <button
-                type="button"
-                class={styles.chip}
-                classList={{ [styles.chipActive]: app.filters.range === window.id }}
-                onClick={() => app.setFilters('range', window.id)}
-              >
-                {window.label}
-              </button>
-            )}
-          </For>
+      <div class={styles.filterRow}>
+        <div class={styles.group}>
+          <span class={styles.label}>Ventana</span>
+          <div class={styles.chips} role="group" aria-label="Ventana temporal">
+            <For each={TIME_WINDOWS}>
+              {(window) => (
+                <button
+                  type="button"
+                  class={styles.chip}
+                  classList={{ [styles.chipActive]: app.filters.range === window.id }}
+                  onClick={() => app.setFilters('range', window.id)}
+                >
+                  {window.label}
+                </button>
+              )}
+            </For>
+          </div>
         </div>
-      </div>
 
-      <div class={styles.group}>
-        <span class={styles.label}>Fuente</span>
-        <div class={styles.chips} role="group" aria-label="Fuente de datos">
-          <For each={SOURCES}>
-            {(source) => (
-              <button
-                type="button"
-                class={styles.chip}
-                classList={{ [styles.chipActive]: app.filters.source === source.id }}
-                onClick={() => app.setFilters('source', source.id)}
-              >
-                <span class={styles.sourceDot} style={{ background: source.tone }} />
-                {source.label}
-              </button>
-            )}
-          </For>
+        <div class={styles.group}>
+          <span class={styles.label}>Fuente</span>
+          <div class={styles.chips} role="group" aria-label="Fuente de datos">
+            <For each={SOURCES}>
+              {(source) => (
+                <button
+                  type="button"
+                  class={styles.chip}
+                  classList={{ [styles.chipActive]: app.filters.source === source.id }}
+                  onClick={() => app.setFilters('source', source.id)}
+                >
+                  <span class={styles.sourceDot} style={{ background: source.tone }} />
+                  {source.label}
+                </button>
+              )}
+            </For>
+          </div>
         </div>
       </div>
     </section>

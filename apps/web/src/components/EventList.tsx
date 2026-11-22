@@ -10,7 +10,7 @@ import {
 } from '@sismos/seismic';
 import { useApp } from '../state';
 import { IconAlert, IconChevron, IconTsunami } from './Icons';
-import styles from './EventList.module.css';
+import styles from '../styles/components/EventList.module.css';
 
 const PAGE_SIZE = 80;
 
@@ -104,13 +104,20 @@ export default function EventList() {
                     <span class={styles.meta}>
                       <span class={styles.time}>{timeAgo(event.timestamp, app.now())}</span>
                       <span class={styles.sep}>·</span>
-                      <span>{formatDepth(event.depth)}</span>
+                      <span class={styles.depth}>{formatDepth(event.depth)}</span>
+                      <span class={styles.sep}>·</span>
                       <span class={styles.source} data-source={event.source}>
                         {event.source}
                       </span>
+                      <Show when={isNew()}>
+                        <span class={styles.sep}>·</span>
+                        <span class={styles.newLabel} title="Evento reciente">
+                          Nuevo
+                        </span>
+                      </Show>
                       <Show when={event.tsunami}>
                         <span class={styles.flag} title="Aviso de tsunami">
-                          <IconTsunami size={11} />
+                          <IconTsunami size={12} />
                         </span>
                       </Show>
                       <Show when={event.alert}>
@@ -119,15 +126,12 @@ export default function EventList() {
                           data-alert={event.alert}
                           title={`Alerta ${event.alert}`}
                         >
-                          <IconAlert size={11} />
+                          <IconAlert size={12} />
                         </span>
                       </Show>
                     </span>
                   </span>
 
-                  <Show when={isNew()}>
-                    <span class={styles.newDot} title="Evento reciente" />
-                  </Show>
                   <IconChevron size={14} class={styles.chevron} />
                 </button>
               );

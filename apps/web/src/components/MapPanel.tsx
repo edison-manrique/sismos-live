@@ -31,7 +31,7 @@ import {
   IconTsunami,
   IconWave,
 } from './Icons';
-import styles from './MapPanel.module.css';
+import styles from '../styles/components/MapPanel.module.css';
 
 const REGION_LABEL = { peru: 'Perú', world: 'Global' } as const;
 

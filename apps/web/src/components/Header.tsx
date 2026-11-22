@@ -9,7 +9,7 @@ import {
   IconSoundOff,
   LogoMark,
 } from './Icons';
-import styles from './Header.module.css';
+import styles from '../styles/components/Header.module.css';
 
 export default function Header() {
   const app = useApp();
@@ -20,13 +20,13 @@ export default function Header() {
     <header class={styles.header}>
       <div class={styles.brand}>
         <div class={styles.logo}>
-          <LogoMark size={26} />
+          <LogoMark size={22} />
         </div>
         <div class={styles.brandText}>
           <div class={styles.title}>
-            SISMOS <span class={styles.liveTag}>LIVE</span>
+            SISMOS <span class={styles.titleAccent}>LIVE</span>
           </div>
-          <div class={styles.subtitle}>EMSC · USGS · tiempo real</div>
+          <div class={styles.subtitle}>EMSC · USGS · Monitoreo sísmico</div>
         </div>
       </div>
 
